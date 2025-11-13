@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="it">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Fototrappola</title>
+
+        <!-- Bulma CSS -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bulma@1.0.0/css/bulma.min.css"
+        />
+
+        <!-- Leaflet CSS -->
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+            crossorigin=""
+        />
+
+        <style>
+            #map {
+                height: 400px;
+                width: 100%;
+                border-radius: 8px;
+            }
+            video {
+                max-width: 100%;
+                margin-top: 1rem;
+                border-radius: 8px;
+            }
+        </style>
+    </head>
+    <body>
+        <section class="section">
+            <div class="container">
+                <h1 class="title is-3">Carica video fototrappola</h1>
+
+                {% with messages = get_flashed_messages() %} {% if messages %}
+                <div class="notification is-success">
+                    {% for msg in messages %}
+                    <p>{{ msg|safe }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %} {% endwith %}
+
+                <form
+                    id="uploadForm"
+                    method="post"
+                    action="/upload"
+                    enctype="multipart/form-data"
+                >
+                    <div class="field">
+                        <label class="label">Titolo</label>
+                        <div class="control">
+                            <input
+                                class="input"
+                                name="title"
+                                type="text"
+                                placeholder="Titolo del video"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label">Video</label>
+                        <div class="file has-name is-fullwidth">
+                            <label class="file-label">
+                                <input
+                                    class="file-input"
+                                    type="file"
+                                    name="video"
+                                    accept="video/*"
+                                    required
+                                    onchange="document.getElementById('file-name').textContent = this.files[0]?.name || ''"
+                                />
+                                <span class="file-cta">
+                                    <span class="file-icon"> 📹 </span>
+                                    <span class="file-label"
+                                        >Scegli un video…</span
+                                    >
+                                </span>
+                                <span id="file-name" class="file-name"
+                                    >Nessun file selezionato</span
+                                >
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label">Descrizione</label>
+                        <div class="control">
+                            <input
+                                class="input"
+                                name="description"
+                                type="text"
+                                placeholder="Breve descrizione"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="columns is-multiline">
+                        <div class="column is-half">
+                            <div class="field">
+                                <label class="label">Latitudine</label>
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        id="latDisplay"
+                                        readonly
+                                    />
+                                    <input
+                                        type="hidden"
+                                        name="latitude"
+                                        id="lat"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <div class="field">
+                                <label class="label">Longitudine</label>
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        id="lngDisplay"
+                                        readonly
+                                    />
+                                    <input
+                                        type="hidden"
+                                        name="longitude"
+                                        id="lng"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="help">
+                        Clicca sulla mappa per impostare le coordinate della
+                        fototrappola.
+                    </p>
+
+                    <div id="map" class="mb-4"></div>
+
+                    <div class="field is-grouped">
+                        <div class="control">
+                            <button class="button is-primary" type="submit">
+                                Carica
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                {% if video_url %}
+                <div class="box mt-5">
+                    <h2 class="subtitle is-4">Anteprima video caricato</h2>
+                    <video controls src="{{ video_url }}"></video>
+                    <p class="mt-3">
+                        <strong>Titolo:</strong> {{ title }}<br />
+                        <strong>Descrizione:</strong> {{ description }}<br />
+                        <strong>Posizione:</strong> {{ lat }}, {{ lng }}
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <script
+            src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            crossorigin=""
+        ></script>
+        <script>
+            const map = L.map("map").setView([45.065, 7.68], 13);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "© OpenStreetMap",
+            }).addTo(map);
+
+            let marker = null;
+
+            function setPosition(lat, lng) {
+                document.getElementById("latDisplay").value = lat.toFixed(6);
+                document.getElementById("lngDisplay").value = lng.toFixed(6);
+                document.getElementById("lat").value = lat;
+                document.getElementById("lng").value = lng;
+            }
+
+            map.on("click", (e) => {
+                const { lat, lng } = e.latlng;
+                if (!marker) {
+                    marker = L.marker([lat, lng], { draggable: true }).addTo(
+                        map,
+                    );
+                    marker.on("dragend", (ev) => {
+                        const p = ev.target.getLatLng();
+                        setPosition(p.lat, p.lng);
+                    });
+                } else {
+                    marker.setLatLng([lat, lng]);
+                }
+                setPosition(lat, lng);
+            });
+        </script>
+    </body>
+</html>
