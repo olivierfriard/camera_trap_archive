@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <title>Fototrappola</title>
+        <title>Avistamento fototrappola</title>
 
         <!-- Bulma CSS -->
         <link
@@ -34,7 +34,7 @@
     <body>
         <section class="section">
             <div class="container">
-                <h1 class="title is-3">Carica video fototrappola</h1>
+                <h1 class="title is-3">Avistamento fototrappola</h1>
 
                 {% with messages = get_flashed_messages() %} {% if messages %}
                 <div class="notification is-success">
@@ -47,10 +47,10 @@
                 <form
                     id="uploadForm"
                     method="post"
-                    action="/upload"
+                    action="/upload_video"
                     enctype="multipart/form-data"
                 >
-                    <div class="field">
+                    <!--  <div class="field">
                         <label class="label">Titolo</label>
                         <div class="control">
                             <input
@@ -62,6 +62,7 @@
                             />
                         </div>
                     </div>
+                    -->
 
                     <div class="field">
                         <label class="label">Video</label>
@@ -87,7 +88,7 @@
                             </label>
                         </div>
                     </div>
-
+                    <!--
                     <div class="field">
                         <label class="label">Descrizione</label>
                         <div class="control">
@@ -99,7 +100,8 @@
                             />
                         </div>
                     </div>
-
+-->
+                    <!--
                     <div class="columns is-multiline">
                         <div class="column is-half">
                             <div class="field">
@@ -143,7 +145,7 @@
                     </p>
 
                     <div id="map" class="mb-4"></div>
-
+-->
                     <div class="field is-grouped">
                         <div class="control">
                             <button class="button is-primary" type="submit">
