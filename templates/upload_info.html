@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="it">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Avistamento fototrappola</title>
+
+        <!-- Bulma CSS -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bulma@1.0.0/css/bulma.min.css"
+        />
+
+        <!-- Leaflet CSS -->
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+            crossorigin=""
+        />
+
+        <style>
+            #map {
+                height: 400px;
+                width: 100%;
+                border-radius: 8px;
+            }
+            video {
+                max-width: 100%;
+                margin-top: 1rem;
+                border-radius: 8px;
+            }
+        </style>
+    </head>
+    <body>
+        <section class="section">
+            <div class="container">
+                <h1 class="title is-3">Avistamento fototrappola</h1>
+
+                {% with messages = get_flashed_messages() %} {% if messages %}
+                <div class="notification is-success">
+                    {% for msg in messages %}
+                    <p>{{ msg|safe }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %} {% endwith %} {% if video_url %}
+                <div class="box mt-5">
+                    <h2 class="subtitle is-4">Anteprima video caricato</h2>
+                    <video controls src="{{ video_url }}" width="640"></video>
+                    <p class="mt-3">
+                        <strong>Data:</strong> {{ data }}<br />
+                        <strong>Ora:</strong> {{ ora }}<br />
+                    </p>
+                </div>
+                {% endif %}
+
+                <form
+                    id="uploadForm"
+                    method="post"
+                    action="/upload_info"
+                    enctype="multipart/form-data"
+                >
+                    <div class="field">
+                        <label class="label">Operatore</label>
+                        <div class="control">
+                            <input
+                                class="input"
+                                name="operatore"
+                                type="text"
+                                placeholder="operatore"
+                                required
+                            />
+                        </div>
+                    </div>
+                    <div class="columns is-multiline">
+                        <div class="column is-half">
+                            <div class="field">
+                                <label class="label">ID fototrappola</label>
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        name="id_fototrappola"
+                                        type="text"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <div class="field">
+                                <label class="label">Codice</label>
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        name="codice"
+                                        type="text"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="columns is-multiline">
+                        <div class="column is-half">
+                            <div class="field">
+                                <label class="label">Numero di lupi</label>
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        name="numero_lupi"
+                                        type="number"
+                                        min="0"
+                                        max="120"
+                                        step="1"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <div class="field">
+                                <label class="label" for="scalp">SCALP</label>
+                                <div class="control">
+                                    <div class="select">
+                                        <select
+                                            id="scalp"
+                                            name="scalp"
+                                            required
+                                        >
+                                            <option value="">
+                                                Seleziona un codice
+                                            </option>
+                                            <option value="C1">C1</option>
+                                            <option value="C3">C3</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label">Note</label>
+                        <div class="control">
+                            <textarea
+                                name="note"
+                                class="textarea"
+                                placeholder="Digitate le vostre note..."
+                            ></textarea>
+                        </div>
+                    </div>
+
+                    <!--
+                   <div class="field">
+                        <label class="label">Video</label>
+                        <div class="file has-name is-fullwidth">
+                            <label class="file-label">
+                                <input
+                                    class="file-input"
+                                    type="file"
+                                    name="video"
+                                    accept="video/*"
+                                    required
+                                    onchange="document.getElementById('file-name').textContent = this.files[0]?.name || ''"
+                                />
+                                <span class="file-cta">
+                                    <span class="file-icon"> 📹 </span>
+                                    <span class="file-label"
+                                        >Scegli un video…</span
+                                    >
+                                </span>
+                                <span id="file-name" class="file-name"
+                                    >Nessun file selezionato</span
+                                >
+                            </label>
+                        </div>
+                    </div>
+                    -->
+
+                    <div class="columns is-multiline">
+                        <div class="column is-one-third">
+                            <div class="field">
+                                <label class="label">Latitudine</label>
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        id="latDisplay"
+                                        readonly
+                                    />
+                                    <input
+                                        type="hidden"
+                                        name="latitude"
+                                        id="lat"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column is-one-third">
+                            <div class="field">
+                                <label class="label">Longitudine</label>
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        id="lngDisplay"
+                                        readonly
+                                    />
+                                    <input
+                                        type="hidden"
+                                        name="longitude"
+                                        id="lng"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="column is-one-third">
+                            <div class="field">
+                                <label class="label">Codice transetto</label>
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        id="codice_transetto"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="help">
+                        Clicca sulla mappa per impostare le coordinate della
+                        fototrappola.
+                    </p>
+
+                    <div id="map" class="mb-4"></div>
+
+                    <div class="field is-grouped">
+                        <div class="control">
+                            <button class="button is-primary" type="submit">
+                                Carica
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <script
+            src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            crossorigin=""
+        ></script>
+        <script>
+            const map = L.map("map").setView([45.065, 7.68], 13);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "© OpenStreetMap",
+            }).addTo(map);
+
+            let marker = null;
+
+            function setPosition(lat, lng) {
+                document.getElementById("latDisplay").value = lat.toFixed(6);
+                document.getElementById("lngDisplay").value = lng.toFixed(6);
+                document.getElementById("lat").value = lat;
+                document.getElementById("lng").value = lng;
+            }
+
+            map.on("click", (e) => {
+                const { lat, lng } = e.latlng;
+                if (!marker) {
+                    marker = L.marker([lat, lng], { draggable: true }).addTo(
+                        map,
+                    );
+                    marker.on("dragend", (ev) => {
+                        const p = ev.target.getLatLng();
+                        setPosition(p.lat, p.lng);
+                    });
+                } else {
+                    marker.setLatLng([lat, lng]);
+                }
+                setPosition(lat, lng);
+            });
+        </script>
+    </body>
+</html>
