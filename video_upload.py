@@ -19,13 +19,15 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
+APP_ROOT = "/fototrappole"
 
-@app.route("/")
+
+@app.route(APP_ROOT)
 def index():
     return render_template("upload_video.html")
 
 
-@app.route("/upload_video", methods=["POST"])
+@app.route(APP_ROOT + "/upload_video", methods=["POST"])
 def upload_video():
     # title = request.form.get("title")
     # description = request.form.get("description")
@@ -56,7 +58,7 @@ def upload_video():
     )
 
 
-@app.route("/upload_info", methods=["POST"])
+@app.route(APP_ROOT + "/upload_info", methods=["POST"])
 def upload_info():
     operatore = request.form.get("operatore")
     numero_lupi = request.form.get("numero_lupi")
@@ -87,7 +89,7 @@ def upload_info():
     )
 
 
-@app.route("/uploads/<filename>")
+@app.route(APP_ROOT + "/uploads/<filename>")
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
