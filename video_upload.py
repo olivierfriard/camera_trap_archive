@@ -1,5 +1,6 @@
 import os
 
+
 from flask import (
     Flask,
     flash,
@@ -7,9 +8,10 @@ from flask import (
     render_template,
     request,
     send_from_directory,
-    url_for,
+    url_for,session,
 )
 from werkzeug.utils import secure_filename
+import camtrap_banner_decoder
 
 app = Flask(__name__)
 app.secret_key = "secret-key"  # cambia in produzione
@@ -21,18 +23,57 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 APP_ROOT = "/fototrappole"
 
+USERS = {
+    "admin": {'pwd': "admin123", 'fullname': "Administrator", "institution": "Università di Torino", "code": 'UNI'},
+    "user": {'pwd': "user123", 'fullname': "User Name", "institution": "Università di Torino", "code": 'UNI'},
+}
+
+# --- Login required decorator ---
+def login_required(f):
+    from functools import wraps
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "username" not in session:
+            flash("Devi effettuare il login per accedere a questa pagina.")
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+
+    return decorated_function
 
 @app.route(APP_ROOT)
+@login_required
 def index():
     return render_template("upload_video.html")
 
+@app.route(APP_ROOT + "/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        if username in USERS and USERS[username]['pwd'] == password:
+            session["username"] = username
+            session["fullname"] = USERS[username]['fullname']
+            session["institution"] = USERS[username]['institution']
+            session["code"] = USERS[username]['code']
+
+            flash(f"Benvenuto, {session["fullname"]} ({session["institution"] })!")
+            return redirect(url_for("index"))
+        else:
+            flash("Username o password non validi.")
+    return render_template("login.html")
+
+
+@app.route(APP_ROOT + "/logout")
+def logout():
+    session.pop("username", None)
+    flash("Logout effettuato.")
+    return redirect(url_for("login"))
+
 
 @app.route(APP_ROOT + "/upload_video", methods=["POST"])
+@login_required
 def upload_video():
-    # title = request.form.get("title")
-    # description = request.form.get("description")
-    # lat = request.form.get("latitude")
-    # lng = request.form.get("longitude")
     video = request.files.get("video")
 
     if not video:
@@ -48,17 +89,31 @@ def upload_video():
         f"Video caricato con successo! <!--<a href='{video_url}' target='_blank'>Apri file</a>-->"
     )
 
+    # check date time
+    data = camtrap_banner_decoder.extract_date_time(save_path)
+    print(f"{data=}")
+    code: str = ''
+    if data['date']:
+        code = data['date'][2:].replace('-', '')  + session['code']
+    else:
+        code = session['code']
+    try:
+        time_ = data['time'][:2] + ':' + data['time'][2:4] + ':' + data['time'][4:6]
+    except Exception:
+        time_ = data['time']
+
+
     return render_template(
         "upload_info.html",
         video_url=video_url,
-        # title=title,
-        # description=description,
-        # lat=lat,
-        # lng=lng,
-    )
+        code=code,
+        date=data['date'],
+        time_=time_,
+        )
 
 
 @app.route(APP_ROOT + "/upload_info", methods=["POST"])
+@login_required
 def upload_info():
     operatore = request.form.get("operatore")
     numero_lupi = request.form.get("numero_lupi")
@@ -90,6 +145,7 @@ def upload_info():
 
 
 @app.route(APP_ROOT + "/uploads/<filename>")
+@login_required
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 

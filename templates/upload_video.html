@@ -47,7 +47,7 @@
                 <form
                     id="uploadForm"
                     method="post"
-                    action="/upload_video"
+                    action="{{ url_for('upload_video') }}"
                     enctype="multipart/form-data"
                 >
                     <!--  <div class="field">
@@ -88,64 +88,7 @@
                             </label>
                         </div>
                     </div>
-                    <!--
-                    <div class="field">
-                        <label class="label">Descrizione</label>
-                        <div class="control">
-                            <input
-                                class="input"
-                                name="description"
-                                type="text"
-                                placeholder="Breve descrizione"
-                            />
-                        </div>
-                    </div>
--->
-                    <!--
-                    <div class="columns is-multiline">
-                        <div class="column is-half">
-                            <div class="field">
-                                <label class="label">Latitudine</label>
-                                <div class="control">
-                                    <input
-                                        class="input"
-                                        id="latDisplay"
-                                        readonly
-                                    />
-                                    <input
-                                        type="hidden"
-                                        name="latitude"
-                                        id="lat"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                        <div class="column is-half">
-                            <div class="field">
-                                <label class="label">Longitudine</label>
-                                <div class="control">
-                                    <input
-                                        class="input"
-                                        id="lngDisplay"
-                                        readonly
-                                    />
-                                    <input
-                                        type="hidden"
-                                        name="longitude"
-                                        id="lng"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <p class="help">
-                        Clicca sulla mappa per impostare le coordinate della
-                        fototrappola.
-                    </p>
-
-                    <div id="map" class="mb-4"></div>
--->
+ 
                     <div class="field is-grouped">
                         <div class="control">
                             <button class="button is-primary" type="submit">
@@ -154,6 +97,8 @@
                         </div>
                     </div>
                 </form>
+<br><br>
+                <a class="button is-warning is-small" href="{{ url_for('logout') }}">Logout</a>
 
                 {% if video_url %}
                 <div class="box mt-5">
