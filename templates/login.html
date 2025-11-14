@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+</head>
+<body>
+<section class="section">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-4-desktop">
+        <h1 class="title has-text-centered">Login</h1>
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="notification is-danger">
+              {% for message in messages %}
+                <p>{{ message }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        <div class="box">
+          <form method="POST">
+            <div class="field">
+              <label class="label">Username</label>
+              <div class="control">
+                <input class="input" type="text" name="username" placeholder="Enter your username" required>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="label">Password</label>
+              <div class="control">
+                <input class="input" type="password" name="password" placeholder="Enter your password" required>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="control">
+                <button class="button is-primary is-fullwidth" type="submit">Login</button>
+              </div>
+            </div>
+          </form>
+        </div>
+        <p class="has-text-centered">
+          &copy; {{ current_year }} Università di Torino
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+</body>
+</html>
