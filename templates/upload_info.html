@@ -59,14 +59,18 @@
                     action="{{ url_for('save_info') }}"
                     enctype="multipart/form-data"
                 >
-                    <div class="field">
+
+                <input type="hidden" name="video_filename" value="{{ video_filename }}">
+
+                <div class="field">
                         <label class="label">Operatore</label>
                         <div class="control">
                             <input
                                 class="input"
-                                name="operatore"
+                                name="operator"
                                 type="text"
                                 placeholder="operatore"
+                                value="{{ operator }}"
                                 required
                             />
                         </div>
@@ -78,7 +82,7 @@
                                 <div class="control">
                                     <input
                                         class="input"
-                                        name="id_fototrappola"
+                                        name="camtrap_id"
                                         type="text"
                                         required
                                     />
@@ -91,7 +95,7 @@
                                 <div class="control">
                                     <input
                                         class="input"
-                                        name="codice"
+                                        name="code"
                                         type="text"
                                         value="{{ code }}"
                                         required
@@ -220,7 +224,7 @@
                                 <div class="control">
                                     <input
                                         class="input"
-                                        id="codice_transetto"
+                                        name="transect_id"
                                     />
                                 </div>
                             </div>

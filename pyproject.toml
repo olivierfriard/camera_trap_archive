@@ -5,5 +5,8 @@ requires-python = ">=3.13"
 dependencies = [
     "flask>=3.1.2",
     "opencv-python-headless>=4.12.0.88",
+    "psycopg2>=2.9.11",
+    "psycopg2-binary>=2.9.11",
     "pytesseract>=0.3.13",
+    "sqlalchemy>=2.0.44",
 ]

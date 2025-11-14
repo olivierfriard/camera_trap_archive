@@ -60,7 +60,9 @@ __version__ = "0.0.2"
 EXTENSIONS = {".avi", ".mp4", ".jpg", ".jpeg"}
 
 
-def banner_text_from_frame(    frame, roi_height_fraction: float = 0.15, debug=False, file_path=""):
+def banner_text_from_frame(
+    frame, roi_height_fraction: float = 0.15, debug=False, file_path=""
+):
     """
     extract text from frame banner
     """
@@ -107,7 +109,9 @@ def banner_text_from_frame(    frame, roi_height_fraction: float = 0.15, debug=F
     return extracted_text
 
 
-def extract_banner_text_from_video(    video_path, frame_interval=30, roi_height_fraction=0.15, debug=False):
+def extract_banner_text_from_video(
+    video_path, frame_interval=30, roi_height_fraction=0.15, debug=False
+):
     """
     Extracts text from the bottom banner of a video.
 
@@ -199,7 +203,7 @@ def extract_date_time(path_file, debug=False):
                     case r"\d{2}-\d{2}-\d{4}":
                         raw_date_splitted = raw_date.split("-")
                         date = f"{raw_date_splitted[2]}-{raw_date_splitted[0]}-{raw_date_splitted[1]}"
-                    case r"\d{2}/\d{2}/\d{4}": # ITA
+                    case r"\d{2}/\d{2}/\d{4}":  # ITA
                         raw_date_splitted = raw_date.split("/")
                         date = f"{raw_date_splitted[2]}-{raw_date_splitted[1]}-{raw_date_splitted[0]}"
                 flag_info = True
