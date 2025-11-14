@@ -11,7 +11,7 @@
   <div class="container">
     <div class="columns is-centered">
       <div class="column is-4-desktop">
-        <h1 class="title has-text-centered">Login</h1>
+        <h1 class="title has-text-centered">Archivio fototrappole<br>Login</h1>
         {% with messages = get_flashed_messages() %}
           {% if messages %}
             <div class="notification is-danger">
@@ -24,16 +24,16 @@
         <div class="box">
           <form method="POST">
             <div class="field">
-              <label class="label">Username</label>
+              <label class="label">Login</label>
               <div class="control">
-                <input class="input" type="text" name="username" placeholder="Enter your username" required>
+                <input class="input" type="text" name="username"  required>
               </div>
             </div>
 
             <div class="field">
               <label class="label">Password</label>
               <div class="control">
-                <input class="input" type="password" name="password" placeholder="Enter your password" required>
+                <input class="input" type="password" name="password"  required>
               </div>
             </div>
 
