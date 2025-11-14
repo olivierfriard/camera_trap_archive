@@ -112,36 +112,29 @@ def upload_video():
         )
 
 
-@app.route(APP_ROOT + "/upload_info", methods=["POST"])
+@app.route(APP_ROOT + "/save_info", methods=["POST"])
 @login_required
-def upload_info():
+def save_info():
     operatore = request.form.get("operatore")
     numero_lupi = request.form.get("numero_lupi")
-    # lat = request.form.get("latitude")
-    # lng = request.form.get("longitude")
-    video = request.files.get("video")
+    lat = request.form.get("latitude")
+    lng = request.form.get("longitude")
 
-    if not video:
-        flash("Nessun file video caricato!")
-        return redirect(url_for("index"))
+    #video = request.files.get("video")
+    #if not video:
+    #    flash("Nessun file video caricato!")
+    #    return redirect(url_for("index"))
 
-    filename = secure_filename(video.filename)
-    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    video.save(save_path)
+    #filename = secure_filename(video.filename)
+    #save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    #video.save(save_path)
 
-    video_url = url_for("uploaded_file", filename=filename)
-    flash(
-        f"Video caricato con successo! <!--<a href='{video_url}' target='_blank'>Apri file</a>-->"
-    )
+    #video_url = url_for("uploaded_file", filename=filename)
+    #flash(
+    #    f"Video caricato con successo! <!--<a href='{video_url}' target='_blank'>Apri file</a>-->"
+    #)
 
-    return render_template(
-        "upload_info.html",
-        video_url=video_url,
-        # title=title,
-        # description=description,
-        # lat=lat,
-        # lng=lng,
-    )
+    return "NOT YET IMPLEMENTED"
 
 
 @app.route(APP_ROOT + "/uploads/<filename>")
