@@ -79,7 +79,8 @@
                         name="file_content_md5"
                         value="{{ file_content_md5 }}"
                     />
-
+                    <input type="hidden" name="date" value="{{ date }}" />
+                    <input type="hidden" name="time_" value="{{ time_ }}" />
                     <div class="field">
                         <label class="label">Operatore</label>
                         <div class="control">
@@ -103,6 +104,7 @@
                                         name="camtrap_id"
                                         type="text"
                                         required
+                                        value="{{ camtrap_id }}"
                                     />
                                 </div>
                             </div>
@@ -130,12 +132,13 @@
                                 <div class="control">
                                     <input
                                         class="input"
-                                        name="numero_lupi"
+                                        name="wolf_number"
                                         type="number"
                                         min="0"
                                         max="120"
                                         step="1"
                                         required
+                                        value="{{ wolf_number }}"
                                     />
                                 </div>
                             </div>
@@ -169,7 +172,9 @@
                                 name="note"
                                 class="textarea"
                                 placeholder="Digitate le vostre note..."
-                            ></textarea>
+                            >
+{{ notes }}</textarea
+                            >
                         </div>
                     </div>
 
@@ -182,11 +187,8 @@
                                         class="input"
                                         id="latDisplay"
                                         readonly
-                                    />
-                                    <input
-                                        type="hidden"
                                         name="latitude"
-                                        id="lat"
+                                        value="{{ latitude }}"
                                     />
                                 </div>
                             </div>
@@ -199,11 +201,8 @@
                                         class="input"
                                         id="lngDisplay"
                                         readonly
-                                    />
-                                    <input
-                                        type="hidden"
                                         name="longitude"
-                                        id="lng"
+                                        value="{{ longitude }}"
                                     />
                                 </div>
                             </div>
@@ -213,7 +212,11 @@
                             <div class="field">
                                 <label class="label">Codice transetto</label>
                                 <div class="control">
-                                    <input class="input" name="transect_id" />
+                                    <input
+                                        class="input"
+                                        name="transect_id"
+                                        value="{{ transect_id }}"
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -260,8 +263,6 @@
             function setPosition(lat, lng) {
                 document.getElementById("latDisplay").value = lat.toFixed(6);
                 document.getElementById("lngDisplay").value = lng.toFixed(6);
-                document.getElementById("lat").value = lat;
-                document.getElementById("lng").value = lng;
             }
 
             map.on("click", (e) => {

@@ -201,16 +201,15 @@ def save_info():
     """
     save info into db
     """
-    print(request.form)
 
-    operator = request.form.get("operator")
+    # operator = request.form.get("operator")
     camtrap_id = request.form.get("camtrap_id")
     code = request.form.get("code")
-    numero_lupi = request.form.get("numero_lupi")
+    wolf_number = request.form.get("wolf_number")
     scalp = request.form.get("scalp")
     notes = request.form.get("note") if request.form.get("note") else None
-    lat = request.form.get("latitude")
-    lng = request.form.get("longitude")
+    latitude = request.form.get("latitude")
+    longitude = request.form.get("longitude")
     transect_id = (
         request.form.get("transect_id") if request.form.get("transect_id") else None
     )
@@ -218,12 +217,34 @@ def save_info():
     original_file_name = request.form.get("original_file_name")
     new_file_name = request.form.get("new_file_name")
     file_content_md5 = request.form.get("file_content_md5")
-
-    print(f"{original_file_name=}")
-    print(f"{new_file_name=}")
-    print(f"{file_content_md5=}")
+    date = request.form.get("date")
+    time_ = request.form.get("time_")
+    video_url = url_for("uploaded_file", filename=new_file_name)
 
     with engine.connect() as conn:
+        # check if code already present in database
+        query = text("SELECT COUNT(*) FROM sighting WHERE code = :code")
+        n_code = conn.execute(query, {"code": code}).scalar()
+        if n_code:
+            flash(f"Il codice {code} è già presente nel database")
+            return render_template(
+                "upload_info.html",
+                original_file_name=original_file_name,
+                new_file_name=str(new_file_name),
+                video_url=video_url,
+                operator=session["fullname"],
+                code=code,
+                date=date,
+                time_=time_,
+                file_content_md5=file_content_md5,
+                camtrap_id=camtrap_id,
+                wolf_number=wolf_number,
+                notes=notes,
+                latitude=latitude,
+                longitude=longitude,
+                transect_id=transect_id,
+            )
+
         query = text("""
             INSERT INTO sighting
                 (code, operator, institution, timestamp, camtrap_id, scalp, transect_id, wolf_number, latitude, longitude, notes)
@@ -242,9 +263,9 @@ def save_info():
                 "camtrap_id": camtrap_id,
                 "scalp": scalp,
                 "transect_id": transect_id if transect_id else None,
-                "wolf_number": numero_lupi,
-                "latitude": lat,
-                "longitude": lng,
+                "wolf_number": wolf_number,
+                "latitude": latitude,
+                "longitude": longitude,
                 "notes": notes,
             },
         )
