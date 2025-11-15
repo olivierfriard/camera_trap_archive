@@ -19,7 +19,7 @@
                         </h1>
                         {% with messages = get_flashed_messages() %} {% if
                         messages %}
-                        <div class="notification is-danger">
+                        <div class="notification is-success">
                             {% for message in messages %}
                             <p>{{ message }}</p>
                             {% endfor %}
@@ -28,8 +28,8 @@
                         <div class="box">
                             <a
                                 class="button is-primary is-large"
-                                href="{{ url_for('upload_video') }}"
-                                >Carica video</a
+                                href="{{ url_for('upload_video_form') }}"
+                                >Nuovo avistamento</a
                             >
                         </div>
                         <p class="has-text-centered">

@@ -56,6 +56,12 @@ def index():
     return render_template("index.html")
 
 
+@app.route(APP_ROOT + "/upload_video_form")
+@login_required
+def upload_video_form():
+    return render_template("upload_video.html")
+
+
 @app.route(APP_ROOT + "/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -96,8 +102,37 @@ def upload_video():
         flash("Nessun file video caricato!")
         return redirect(url_for("index"))
 
+    # compute MD5 incrementally
+    md5 = hashlib.md5()
+    chunk_size = 8192  # 8 KB
+
+    # Read the file stream in chunks
+    for chunk in iter(lambda: video.stream.read(chunk_size), b""):
+        md5.update(chunk)
+    video.stream.seek(0)
+    file_content_md5 = md5.hexdigest()
+    print(file_content_md5)
+
+    # check if md5 already in DB
+    with engine.connect() as conn:
+        query = text(
+            "SELECT code, operator, camtrap_id FROM media,sighting WHERE sighting.id = media.sighting_id AND file_content_md5 = :file_content_md5"
+        )
+        row = (
+            conn.execute(query, {"file_content_md5": file_content_md5})
+            .mappings()
+            .fetchone()
+        )
+        print(row)
+        if row is not None:
+            flash(
+                f"Il file {video.filename} è già presente nel database: {row['operator']}, {row['code']}, {row['camtrap_id']}"
+            )
+            return redirect(url_for("upload_video_form"))
+
     original_file_name = secure_filename(video.filename)
     print(f"{original_file_name=}")
+
     # get new file name
     new_file_name = Path(f"{int(time.time())}_{session['username']}").with_suffix(
         Path(original_file_name).suffix
@@ -108,7 +143,8 @@ def upload_video():
     video.save(save_path)
 
     # md5 of file content
-    file_content_md5 = hashlib.md5(open(save_path, "rb").read()).hexdigest()
+    # file_content_md5 = hashlib.md5(open(save_path, "rb").read()).hexdigest()
+    # print(file_content_md5)
 
     video_url = url_for("uploaded_file", filename=new_file_name)
     flash(
@@ -117,16 +153,20 @@ def upload_video():
 
     # check date time
     data = camtrap_banner_decoder.extract_date_time(save_path)
-    print(f"{data=}")
-    code: str = ""
-    if data["date"]:
-        code = data["date"][2:].replace("-", "") + session["code"]
+    if "error" not in data:
+        print(f"{data=}")
+        code: str = ""
+        if data["date"]:
+            code = data["date"][2:].replace("-", "") + session["code"]
+        else:
+            code = session["code"]
+        try:
+            time_ = data["time"][:2] + ":" + data["time"][2:4] + ":" + data["time"][4:6]
+        except Exception:
+            time_ = data["time"]
     else:
-        code = session["code"]
-    try:
-        time_ = data["time"][:2] + ":" + data["time"][2:4] + ":" + data["time"][4:6]
-    except Exception:
-        time_ = data["time"]
+        code = ""
+        time_ = ""
 
     print(session["fullname"])
 
@@ -217,7 +257,7 @@ def save_info():
         )
         conn.commit()
 
-        flash("Username o password non validi.")
+        flash("Avistamento salvato.")
 
     return redirect(url_for("index"))
 
