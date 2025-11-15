@@ -8,7 +8,7 @@
         <!-- Bulma CSS -->
         <link
             rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/bulma@1.0.0/css/bulma.min.css"
+            href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css"
         />
 
         <!-- Leaflet CSS -->
@@ -45,7 +45,12 @@
                 {% endif %} {% endwith %} {% if video_url %}
                 <div class="box mt-5">
                     <h2 class="subtitle is-4">Anteprima video caricato</h2>
-                    <video id="video_camtrap" src="{{ video_url }}" width="640" preload="metadata"></video>
+                    <video
+                        id="video_camtrap"
+                        src="{{ video_url }}"
+                        width="640"
+                        preload="metadata"
+                    ></video>
                     <p class="mt-3">
                         <strong>Data:</strong> {{ date }}<br />
                         <strong>Ora:</strong> {{ time_ }}<br />
@@ -59,10 +64,23 @@
                     action="{{ url_for('save_info') }}"
                     enctype="multipart/form-data"
                 >
+                    <input
+                        type="hidden"
+                        name="original_file_name"
+                        value="{{ original_file_name }}"
+                    />
+                    <input
+                        type="hidden"
+                        name="new_file_name"
+                        value="{{ new_file_name }}"
+                    />
+                    <input
+                        type="hidden"
+                        name="file_content_md5"
+                        value="{{ file_content_md5 }}"
+                    />
 
-                <input type="hidden" name="video_filename" value="{{ video_filename }}">
-
-                <div class="field">
+                    <div class="field">
                         <label class="label">Operatore</label>
                         <div class="control">
                             <input
@@ -155,33 +173,6 @@
                         </div>
                     </div>
 
-                    <!--
-                   <div class="field">
-                        <label class="label">Video</label>
-                        <div class="file has-name is-fullwidth">
-                            <label class="file-label">
-                                <input
-                                    class="file-input"
-                                    type="file"
-                                    name="video"
-                                    accept="video/*"
-                                    required
-                                    onchange="document.getElementById('file-name').textContent = this.files[0]?.name || ''"
-                                />
-                                <span class="file-cta">
-                                    <span class="file-icon"> 📹 </span>
-                                    <span class="file-label"
-                                        >Scegli un video…</span
-                                    >
-                                </span>
-                                <span id="file-name" class="file-name"
-                                    >Nessun file selezionato</span
-                                >
-                            </label>
-                        </div>
-                    </div>
-                    -->
-
                     <div class="columns is-multiline">
                         <div class="column is-one-third">
                             <div class="field">
@@ -222,10 +213,7 @@
                             <div class="field">
                                 <label class="label">Codice transetto</label>
                                 <div class="control">
-                                    <input
-                                        class="input"
-                                        name="transect_id"
-                                    />
+                                    <input class="input" name="transect_id" />
                                 </div>
                             </div>
                         </div>
@@ -247,11 +235,12 @@
                     </div>
                 </form>
 
-
-
-                <br><br>
-                <a class="button is-warning is-small" href="{{ url_for('logout') }}">Logout</a>
-
+                <br /><br />
+                <a
+                    class="button is-warning is-small"
+                    href="{{ url_for('logout') }}"
+                    >Logout</a
+                >
             </div>
         </section>
 
@@ -292,28 +281,25 @@
             });
         </script>
 
+        <script>
+            const video = document.getElementById("video_camtrap");
 
-<script>
-    const video = document.getElementById('video_camtrap');
-  
-    // Hide controls initially
-    video.controls = false;
-  
-    // Show controls when user clicks or hovers
-    video.addEventListener('mouseenter', () => {
-      video.controls = true;
-    });
-  
-    video.addEventListener('mouseleave', () => {
-        video.controls = false; // hide controls when mouse leaves and video is playing
-    });
-  
-    // Optional: show controls when video is paused
-    video.addEventListener('pause', () => {
-      video.controls = true;
-    });
-  </script>
+            // Hide controls initially
+            video.controls = false;
 
+            // Show controls when user clicks or hovers
+            video.addEventListener("mouseenter", () => {
+                video.controls = true;
+            });
 
-</body>
+            video.addEventListener("mouseleave", () => {
+                video.controls = false; // hide controls when mouse leaves and video is playing
+            });
+
+            // Optional: show controls when video is paused
+            video.addEventListener("pause", () => {
+                video.controls = true;
+            });
+        </script>
+    </body>
 </html>

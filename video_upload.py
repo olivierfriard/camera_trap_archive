@@ -1,5 +1,7 @@
+import hashlib
 import os
-
+import time
+from pathlib import Path
 
 from flask import (
     Flask,
@@ -8,12 +10,14 @@ from flask import (
     render_template,
     request,
     send_from_directory,
-    url_for,
     session,
+    url_for,
 )
-from werkzeug.utils import secure_filename
-import camtrap_banner_decoder
 from sqlalchemy import create_engine, text
+from werkzeug.utils import secure_filename
+
+import camtrap_banner_decoder
+import users
 
 app = Flask(__name__)
 app.secret_key = "secret-key"  # cambia in produzione
@@ -29,20 +33,7 @@ APP_ROOT = "/fototrappole"
 DATABASE_URL = "postgresql://sighting_user@localhost:5432/sighting"
 engine = create_engine(DATABASE_URL)
 
-USERS = {
-    "admin": {
-        "pwd": "admin123",
-        "fullname": "Administrator",
-        "institution": "Università di Torino",
-        "code": "UNI",
-    },
-    "user": {
-        "pwd": "user123",
-        "fullname": "User Name",
-        "institution": "Università di Torino",
-        "code": "UNI",
-    },
-}
+USERS = users.USERS
 
 
 # --- Login required decorator ---
@@ -62,7 +53,7 @@ def login_required(f):
 @app.route(APP_ROOT)
 @login_required
 def index():
-    return render_template("upload_video.html")
+    return render_template("index.html")
 
 
 @app.route(APP_ROOT + "/login", methods=["GET", "POST"])
@@ -93,17 +84,33 @@ def logout():
 @app.route(APP_ROOT + "/upload_video", methods=["POST"])
 @login_required
 def upload_video():
+    """
+    save video
+    extract time and date info
+    rename video
+    """
+
     video = request.files.get("video")
 
     if not video:
         flash("Nessun file video caricato!")
         return redirect(url_for("index"))
 
-    original_filename = secure_filename(video.filename)
-    save_path = os.path.join(app.config["UPLOAD_FOLDER"], original_filename)
+    original_file_name = secure_filename(video.filename)
+    print(f"{original_file_name=}")
+    # get new file name
+    new_file_name = Path(f"{int(time.time())}_{session['username']}").with_suffix(
+        Path(original_file_name).suffix
+    )
+    print(f"{new_file_name=}")
+
+    save_path = Path(app.config["UPLOAD_FOLDER"]) / new_file_name
     video.save(save_path)
 
-    video_url = url_for("uploaded_file", filename=original_filename)
+    # md5 of file content
+    file_content_md5 = hashlib.md5(open(save_path, "rb").read()).hexdigest()
+
+    video_url = url_for("uploaded_file", filename=new_file_name)
     flash(
         f"Video caricato con successo! <!--<a href='{video_url}' target='_blank'>Apri file</a>-->"
     )
@@ -121,33 +128,48 @@ def upload_video():
     except Exception:
         time_ = data["time"]
 
-    print(session['fullname'])
+    print(session["fullname"])
 
     return render_template(
         "upload_info.html",
-        video_filename=original_filename,
+        original_file_name=original_file_name,
+        new_file_name=str(new_file_name),
         video_url=video_url,
-        operator=session['fullname'],
+        operator=session["fullname"],
         code=code,
         date=data["date"],
         time_=time_,
+        file_content_md5=file_content_md5,
     )
 
 
 @app.route(APP_ROOT + "/save_info", methods=["POST"])
 @login_required
 def save_info():
+    """
+    save info into db
+    """
+    print(request.form)
+
     operator = request.form.get("operator")
     camtrap_id = request.form.get("camtrap_id")
     code = request.form.get("code")
     numero_lupi = request.form.get("numero_lupi")
     scalp = request.form.get("scalp")
     notes = request.form.get("note") if request.form.get("note") else None
-
     lat = request.form.get("latitude")
     lng = request.form.get("longitude")
-    transect_id = request.form.get("transect_id") if request.form.get("transect_id") else None
+    transect_id = (
+        request.form.get("transect_id") if request.form.get("transect_id") else None
+    )
 
+    original_file_name = request.form.get("original_file_name")
+    new_file_name = request.form.get("new_file_name")
+    file_content_md5 = request.form.get("file_content_md5")
+
+    print(f"{original_file_name=}")
+    print(f"{new_file_name=}")
+    print(f"{file_content_md5=}")
 
     with engine.connect() as conn:
         query = text("""
@@ -163,7 +185,7 @@ def save_info():
             {
                 "code": code,
                 "operator": operator,
-                "institution":session['institution'],
+                "institution": session["institution"],
                 "timestamp": None,
                 "camtrap_id": camtrap_id,
                 "scalp": scalp,
@@ -177,7 +199,27 @@ def save_info():
         sighting_id = result.scalar()
         conn.commit()
 
-    return f"OK {sighting_id}"
+        query = text("""
+            INSERT INTO media
+                (original_file_name, new_file_name, file_content_md5, sighting_id)
+            VALUES
+                (:original_file_name, :new_file_name, :file_content_md5, :sighting_id)
+        """)
+
+        result = conn.execute(
+            query,
+            {
+                "original_file_name": original_file_name,
+                "new_file_name": new_file_name,
+                "file_content_md5": file_content_md5,
+                "sighting_id": sighting_id,
+            },
+        )
+        conn.commit()
+
+        flash("Username o password non validi.")
+
+    return redirect(url_for("index"))
 
 
 @app.route(APP_ROOT + "/uploads/<filename>")
