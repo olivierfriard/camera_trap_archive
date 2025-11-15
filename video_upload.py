@@ -62,6 +62,18 @@ def upload_video_form():
     return render_template("upload_video.html")
 
 
+@app.route(APP_ROOT + "/sighting_list")
+@login_required
+def sighting_list():
+    with engine.connect() as conn:
+        query = text(
+            "SELECT code, operator, camtrap_id FROM sighting WHERE operator = :operator"
+        )
+        rows = conn.execute(query, {"operator": session["username"]}).mappings().all()
+
+    return render_template("sighting_list.html", sightings=rows)
+
+
 @app.route(APP_ROOT + "/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -224,7 +236,7 @@ def save_info():
             query,
             {
                 "code": code,
-                "operator": operator,
+                "operator": session["username"],
                 "institution": session["institution"],
                 "timestamp": None,
                 "camtrap_id": camtrap_id,
