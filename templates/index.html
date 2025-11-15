@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="it">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Archivio fototrappole</title>
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css"
+        />
+    </head>
+    <body>
+        <section class="section">
+            <div class="container">
+                <div class="columns is-centered">
+                    <div class="column is-4-desktop">
+                        <h1 class="title has-text-centered">
+                            Archivio fototrappole
+                        </h1>
+                        {% with messages = get_flashed_messages() %} {% if
+                        messages %}
+                        <div class="notification is-danger">
+                            {% for message in messages %}
+                            <p>{{ message }}</p>
+                            {% endfor %}
+                        </div>
+                        {% endif %} {% endwith %}
+                        <div class="box">
+                            <a
+                                class="button is-primary is-large"
+                                href="{{ url_for('upload_video') }}"
+                                >Carica video</a
+                            >
+                        </div>
+                        <p class="has-text-centered">
+                            &copy; {{ current_year }} Università di Torino
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </body>
+</html>
