@@ -25,6 +25,7 @@
                             {% endfor %}
                         </div>
                         {% endif %} {% endwith %}
+                        <a class="button" href="{{ url_for('index') }}">Home</a>
                         <div class="box">
                             {% for sighting in sightings %} {{ sighting.code
                             }}<br />

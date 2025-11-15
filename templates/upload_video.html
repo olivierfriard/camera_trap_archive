@@ -34,7 +34,7 @@
     <body>
         <section class="section">
             <div class="container">
-                <h1 class="title is-3">Avistamento fototrappola</h1>
+                <h1 class="title is-3">Nuovo avistamento fototrappola</h1>
 
                 {% with messages = get_flashed_messages() %} {% if messages %}
                 <div class="notification is-success">
@@ -43,7 +43,8 @@
                     {% endfor %}
                 </div>
                 {% endif %} {% endwith %}
-
+                <a class="button" href="{{ url_for('index') }}">Home</a>
+                <br /><br />
                 <form
                     id="uploadForm"
                     method="post"
