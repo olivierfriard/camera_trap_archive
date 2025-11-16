@@ -12,11 +12,11 @@
     <body>
         <section class="section">
             <div class="container">
-                <div class="columns is-centered">
-                    <div class="column is-4-desktop">
+
                         <h1 class="title has-text-centered">
-                            Archivio fototrappole - Elenco avvistamenti
+                            Archivio fototrappole
                         </h1>
+                        <h2 class="title is-4 has-text-centered">Elenco avvistamenti caricati da {{ session['fullname']}}</h2>
                         {% with messages = get_flashed_messages() %} {% if
                         messages %}
                         <div class="notification is-success">
@@ -26,18 +26,18 @@
                         </div>
                         {% endif %} {% endwith %}
                         <a class="button" href="{{ url_for('index') }}">Home</a>
-                        <div class="box">
-                            {% for sighting in sightings %} {{ sighting.code
-                            }}
+                        <br><br>
+
+                            {% for sighting in sightings %} {{ sighting.code }}<br>
                             <img src="{{ sighting.data_uri }}" alt="inline image">
                             <br />
+                            <hr>
                             {% endfor %}
-                        </div>
+
                         <p class="has-text-centered">
                             &copy; {{ current_year }} Università di Torino
                         </p>
-                    </div>
-                </div>
+
             </div>
         </section>
     </body>
