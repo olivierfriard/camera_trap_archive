@@ -28,7 +28,9 @@
                         <a class="button" href="{{ url_for('index') }}">Home</a>
                         <div class="box">
                             {% for sighting in sightings %} {{ sighting.code
-                            }}<br />
+                            }}
+                            <img src="{{ sighting.data_uri }}" alt="inline image">
+                            <br />
                             {% endfor %}
                         </div>
                         <p class="has-text-centered">

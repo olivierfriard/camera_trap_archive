@@ -145,7 +145,7 @@
                         </div>
                         <div class="column is-half">
                             <div class="field">
-                                <label class="label" for="scalp">SCALP</label>
+                                <label class="label" for="scalp">SCALP</label>scalp: {{ scalp }}
                                 <div class="control">
                                     <div class="select">
                                         <select
@@ -156,8 +156,26 @@
                                             <option value="">
                                                 Seleziona un codice
                                             </option>
-                                            <option value="C1">C1</option>
-                                            <option value="C3">C3</option>
+                                            <option
+                                                value="C1"
+                                                {%
+                                                if
+                                                scalp=="C1"
+                                                %}selected{%endif%}
+                                            >
+                                                C1
+                                            </option>
+                                            <option
+                                                value="C3"
+                                                {%
+                                                if
+                                                scalp=="C3"
+                                                %}selected{%
+                                                endif
+                                                %}
+                                            >
+                                                C3
+                                            </option>
                                         </select>
                                     </div>
                                 </div>

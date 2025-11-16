@@ -1,8 +1,10 @@
+import base64
 import hashlib
 import os
 import time
 from pathlib import Path
 
+import cv2
 from flask import (
     Flask,
     flash,
@@ -67,11 +69,19 @@ def upload_video_form():
 def sighting_list():
     with engine.connect() as conn:
         query = text(
-            "SELECT code, operator, camtrap_id FROM sighting WHERE operator = :operator"
+            "SELECT code, operator, camtrap_id, image FROM sighting, media WHERE sighting.id=media.sighting_id AND operator = :operator"
         )
         rows = conn.execute(query, {"operator": session["username"]}).mappings().all()
-
-    return render_template("sighting_list.html", sightings=rows)
+    results = []
+    for row in rows:
+        results.append(
+            {
+                # "image": base64.b64encode(row["image"]).decode("ascii"),
+                "data_uri": f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}",
+                "code": row["code"],
+            }
+        )
+    return render_template("sighting_list.html", sightings=results)
 
 
 @app.route(APP_ROOT + "/login", methods=["GET", "POST"])
@@ -97,6 +107,36 @@ def logout():
     session.pop("username", None)
     flash("Logout effettuato.")
     return redirect(url_for("login"))
+
+
+def extract_frame(video_path, time_sec):
+    cap = cv2.VideoCapture(video_path)
+
+    # Set video position (in milliseconds)
+    cap.set(cv2.CAP_PROP_POS_MSEC, time_sec * 1000)
+
+    success, frame = cap.read()
+    if success:
+        # target width
+        new_width = 640
+        # compute scale factor
+        h, w = frame.shape[:2]
+        scale = new_width / w
+        new_height = int(h * scale)
+
+        # resize frame
+        resized = cv2.resize(frame, (new_width, new_height))
+
+        ok, jpg = cv2.imencode(".jpg", resized)
+        if not ok:
+            cap.release()
+            return None
+
+        return jpg.tobytes()
+    else:
+        print("Failed to extract frame")
+
+    cap.release()
 
 
 @app.route(APP_ROOT + "/upload_video", methods=["POST"])
@@ -242,7 +282,8 @@ def save_info():
                 notes=notes,
                 latitude=latitude,
                 longitude=longitude,
-                transect_id=transect_id,
+                transect_id=transect_id if transect_id is not None else "",
+                scalp=scalp,
             )
 
         query = text("""
@@ -272,11 +313,16 @@ def save_info():
         sighting_id = result.scalar()
         conn.commit()
 
+        # save media
+        jpg_content = extract_frame(
+            str(Path(app.config["UPLOAD_FOLDER"]) / Path(new_file_name)), 1
+        )
+
         query = text("""
             INSERT INTO media
-                (original_file_name, new_file_name, file_content_md5, sighting_id)
+                (original_file_name, new_file_name, file_content_md5, sighting_id, image)
             VALUES
-                (:original_file_name, :new_file_name, :file_content_md5, :sighting_id)
+                (:original_file_name, :new_file_name, :file_content_md5, :sighting_id, :image)
         """)
 
         result = conn.execute(
@@ -286,6 +332,7 @@ def save_info():
                 "new_file_name": new_file_name,
                 "file_content_md5": file_content_md5,
                 "sighting_id": sighting_id,
+                "image": jpg_content,
             },
         )
         conn.commit()
