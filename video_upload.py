@@ -356,5 +356,26 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
+@app.route(APP_ROOT + "/view/<int:sighting_id>")
+@login_required
+def view(sighting_id: int):
+    with engine.connect() as conn:
+        query = text(
+            (
+                "SELECT sighting.id, code, operator, camtrap_id, scalp, image, wolf_number , notes "
+                "FROM media, sighting WHERE sighting.id = media.sighting_id AND sighting.id = :sighting_id"
+            )
+        )
+        row = conn.execute(query, {"sighting_id": sighting_id}).mappings().fetchone()
+
+    return render_template(
+        "view.html",
+        row=row,
+        user=USERS[row["operator"]]["fullname"],
+        institution=USERS[row["operator"]]["institution"],
+        data_uri=f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}",
+    )
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

@@ -17,14 +17,7 @@
                             Archivio fototrappole
                         </h1>
                         <h2 class="title is-4 has-text-centered">Elenco avvistamenti caricati da {{ session['fullname']}}</h2>
-                        {% with messages = get_flashed_messages() %} {% if
-                        messages %}
-                        <div class="notification is-success">
-                            {% for message in messages %}
-                            <p>{{ message }}</p>
-                            {% endfor %}
-                        </div>
-                        {% endif %} {% endwith %}
+
                         <a class="button" href="{{ url_for('index') }}">Home</a>
                         <br><br>
 
