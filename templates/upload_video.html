@@ -36,13 +36,27 @@
             <div class="container">
                 <h1 class="title is-3">Nuovo avistamento fototrappola</h1>
 
-                {% with messages = get_flashed_messages() %} {% if messages %}
-                <div class="notification is-success">
-                    {% for msg in messages %}
-                    <p>{{ msg|safe }}</p>
-                    {% endfor %}
-                </div>
-                {% endif %} {% endwith %}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                      {% if messages %}
+                        <div id="flashes">
+                          {% for category, msg in messages %}
+                            {# Map Flask categories to Bulma notification classes #}
+                            {% set bulma_class = {
+                              'success': 'is-success',
+                              'warning': 'is-warning',
+                              'info':    'is-info',
+                              'danger':  'is-danger',
+                              'error':   'is-danger'
+                            }[category] if category in ['success','warning','info','danger','error'] else 'is-light' %}
+
+                            <div class="notification {{ bulma_class }}">
+                              <button class="delete" aria-label="dismiss"></button>
+                              {{ msg }}
+                            </div>
+                          {% endfor %}
+                        </div>
+                      {% endif %}
+                    {% endwith %}
                 <a class="button" href="{{ url_for('index') }}">Home</a>
                 <br /><br />
                 <form
@@ -51,20 +65,6 @@
                     action="{{ url_for('upload_video') }}"
                     enctype="multipart/form-data"
                 >
-                    <!--  <div class="field">
-                        <label class="label">Titolo</label>
-                        <div class="control">
-                            <input
-                                class="input"
-                                name="title"
-                                type="text"
-                                placeholder="Titolo del video"
-                                required
-                            />
-                        </div>
-                    </div>
-                    -->
-
                     <div class="field">
                         <label class="label">Video</label>
                         <div class="file has-name is-fullwidth">
@@ -104,18 +104,6 @@
                     href="{{ url_for('logout') }}"
                     >Logout</a
                 >
-
-                {% if video_url %}
-                <div class="box mt-5">
-                    <h2 class="subtitle is-4">Anteprima video caricato</h2>
-                    <video controls src="{{ video_url }}"></video>
-                    <p class="mt-3">
-                        <strong>Titolo:</strong> {{ title }}<br />
-                        <strong>Descrizione:</strong> {{ description }}<br />
-                        <strong>Posizione:</strong> {{ lat }}, {{ lng }}
-                    </p>
-                </div>
-                {% endif %}
             </div>
         </section>
 

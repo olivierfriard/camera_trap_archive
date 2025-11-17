@@ -15,6 +15,7 @@ from flask import (
     session,
     url_for,
 )
+from markupsafe import Markup
 from sqlalchemy import create_engine, text
 from werkzeug.utils import secure_filename
 
@@ -45,7 +46,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if "username" not in session:
-            flash("Devi effettuare il login per accedere a questa pagina.")
+            flash("Devi effettuare il login per accedere a questa pagina.", "danger")
             return redirect(url_for("login"))
         return f(*args, **kwargs)
 
@@ -95,17 +96,20 @@ def login():
             session["institution"] = USERS[username]["institution"]
             session["code"] = USERS[username]["code"]
 
-            flash(f"Benvenuto, {session['fullname']} ({session['institution']})!")
+            flash(
+                f"Benvenuto, {session['fullname']} ({session['institution']})!",
+                "success",
+            )
             return redirect(url_for("index"))
         else:
-            flash("Username o password non validi.")
+            flash("Username o password non validi.", "danger")
     return render_template("login.html")
 
 
 @app.route(APP_ROOT + "/logout")
 def logout():
     session.pop("username", None)
-    flash("Logout effettuato.")
+    flash("Logout effettuato.", "success")
     return redirect(url_for("login"))
 
 
@@ -151,7 +155,7 @@ def upload_video():
     video = request.files.get("video")
 
     if not video:
-        flash("Nessun file video caricato!")
+        flash("Nessun file video caricato!", "danger")
         return redirect(url_for("index"))
 
     # compute MD5 incrementally
@@ -178,7 +182,8 @@ def upload_video():
         print(row)
         if row is not None:
             flash(
-                f"Il file {video.filename} è già presente nel database: {row['operator']}, {row['code']}, {row['camtrap_id']}"
+                f"Il file {video.filename} è già presente nel database: {row['operator']}, {row['code']}, {row['camtrap_id']}",
+                "danger",
             )
             return redirect(url_for("upload_video_form"))
 
@@ -199,9 +204,7 @@ def upload_video():
     # print(file_content_md5)
 
     video_url = url_for("uploaded_file", filename=new_file_name)
-    flash(
-        f"Video caricato con successo! <!--<a href='{video_url}' target='_blank'>Apri file</a>-->"
-    )
+    flash(f"Video caricato con successo!", "success")
 
     # check date time
     data = camtrap_banner_decoder.extract_date_time(save_path)
@@ -266,7 +269,12 @@ def save_info():
         query = text("SELECT COUNT(*) FROM sighting WHERE code = :code")
         n_code = conn.execute(query, {"code": code}).scalar()
         if n_code:
-            flash(f"Il codice {code} è già presente nel database")
+            flash(
+                Markup(
+                    f"Il codice dell'avistamento <b>{code}</b> è già presente nel database"
+                ),
+                "danger",
+            )
             return render_template(
                 "upload_info.html",
                 original_file_name=original_file_name,

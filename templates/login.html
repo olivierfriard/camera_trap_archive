@@ -17,14 +17,29 @@
                         <h1 class="title has-text-centered">
                             Archivio fototrappole<br />Login
                         </h1>
-                        {% with messages = get_flashed_messages() %} {% if
-                        messages %}
-                        <div class="notification is-danger">
-                            {% for message in messages %}
-                            <p>{{ message }}</p>
-                            {% endfor %}
-                        </div>
-                        {% endif %} {% endwith %}
+
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                              {% if messages %}
+                                <div id="flashes">
+                                  {% for category, msg in messages %}
+                                    {# Map Flask categories to Bulma notification classes #}
+                                    {% set bulma_class = {
+                                      'success': 'is-success',
+                                      'warning': 'is-warning',
+                                      'info':    'is-info',
+                                      'danger':  'is-danger',
+                                      'error':   'is-danger'
+                                    }[category] if category in ['success','warning','info','danger','error'] else 'is-light' %}
+
+                                    <div class="notification {{ bulma_class }}">
+                                      <button class="delete" aria-label="dismiss"></button>
+                                      {{ msg }}
+                                    </div>
+                                  {% endfor %}
+                                </div>
+                              {% endif %}
+                            {% endwith %}
+
                         <div class="box">
                             <form method="POST">
                                 <div class="field">
