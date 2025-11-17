@@ -345,7 +345,7 @@ def save_info():
         )
         conn.commit()
 
-        flash("Avistamento salvato.")
+        flash("Avistamento salvato.", "success")
 
     return redirect(url_for("index"))
 
