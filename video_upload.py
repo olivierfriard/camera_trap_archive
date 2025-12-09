@@ -143,6 +143,93 @@ def extract_frame(video_path, time_sec):
     cap.release()
 
 
+@app.route(APP_ROOT + "/nuova_fototrappola", methods=["GET", "POST"])
+@login_required
+def nuova_fototrappola():
+    """
+    save nuova fototrappola
+    """
+    if request.method == "GET":
+        return render_template("nuova_fototrappola.html")
+
+
+@app.route(APP_ROOT + "/save_fototrappola", methods=["POST"])
+@login_required
+def save_fototrappola():
+    """
+    save nuova fototrappola
+    """
+    if request.method == "POST":
+        try:
+            # 1️⃣  Recupero dati dalla form
+            codice = request.form.get("codice")
+            typo = request.form.get("typo")
+            data_inizio = request.form.get("data_inizio")
+            data_fine = request.form.get("data_fine")
+            nome = request.form.get("nome")
+            cognome = request.form.get("cognome")
+            regione = request.form.get("regione")
+            provincia = request.form.get("provincia")
+            comune = request.form.get("comune")
+            country = request.form.get("country", "Italia")
+            latitudine = request.form.get("latitudine")
+            longitudine = request.form.get("longitudine")
+            altitudine = request.form.get("altitudine")
+            intersezioni = request.form.get("intersezioni")
+
+            # 2️⃣ Validazione minima (puoi ampliarla)
+            if not codice or not typo:
+                flash("Codice e Tipo sono obbligatori", "error")
+                return redirect(url_for("nuova_fototrappola"))
+
+            # 3️⃣ Query SQL parametrizzata (sicura contro SQL injection)
+            query = text("""
+                INSERT INTO fototrappole (
+                    codice, typo, data_inizio, data_fine, nome, cognome,
+                    regione, provincia, comune, country,
+                    latitudine, longitudine, altitudine, intersezioni
+                )
+                VALUES (
+                    :codice, :typo, :data_inizio, :data_fine, :nome, :cognome,
+                    :regione, :provincia, :comune, :country,
+                    :latitudine, :longitudine, :altitudine, :intersezioni
+                )
+            """)
+
+            # 4️⃣ Esecuzione query
+            with engine.connect() as conn:
+                conn.execute(
+                    query,
+                    {
+                        "codice": codice,
+                        "typo": typo,
+                        "data_inizio": data_inizio,
+                        "data_fine": data_fine if data_fine != "" else None,
+                        "nome": nome,
+                        "cognome": cognome,
+                        "regione": regione,
+                        "provincia": provincia,
+                        "comune": comune,
+                        "country": country,
+                        "latitudine": float(latitudine),
+                        "longitudine": float(longitudine),
+                        "altitudine": float(altitudine) if altitudine else None,
+                        "intersezioni": intersezioni,
+                    },
+                )
+
+                conn.commit()
+
+            flash("Nuova fototrappola inserita con successo!", "success")
+            return redirect(url_for("index"))
+
+        except Exception as e:
+            raise
+            print("Errore INSERT fototrappola:", e)
+            flash("Errore durante il salvataggio.", "error")
+            return redirect(url_for("nuova_fototrappola"))
+
+
 @app.route(APP_ROOT + "/upload_video", methods=["POST"])
 @login_required
 def upload_video():
