@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="it">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Archivio fototrappole</title>
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css"
+        />
+
+
+    </head>
+    <body>
+        <main>
+        <section class="section">
+            <div class="container">
+
+                        <h1 class="title has-text-centered">
+                            Archivio avvistamenti
+                        </h1>
+                        <h2 class="title is-4 has-text-centered">Elenco fototrappole {{ session['fullname']}}</h2>
+
+                        <a class="button" href="{{ url_for('index') }}">Home</a>
+                        <br><br>
+                        <table class="table">
+                            <thead>
+                                <tr><th>Codice</th>
+                                    <th>Tipo</th>
+                                <th>Nome</th>
+                                </tr>
+                            </thead>
+                            {% for foto in fototrappole %}
+                            <tr><td>{{ foto.codice }}</td>
+                            <td>{{ foto.tipo }}</td>
+                            <td>{{ foto.nome }} {{ foto.cognome }}</td>
+                            </tr>
+
+                            {% endfor %}
+                        </table>
+                        <p class="has-text-centered">
+
+                        </p>
+
+            </div>
+        </section>
+</main>
+         {% include "footer.html" %}
+
+    </body>
+</html>
