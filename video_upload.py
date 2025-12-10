@@ -320,7 +320,7 @@ def save_fototrappola():
         try:
             # 1️⃣  Recupero dati dalla form
             codice = request.form.get("codice")
-            typo = request.form.get("typo")
+            tipo = request.form.get("tipo")
             data_inizio = request.form.get("data_inizio")
             data_fine = request.form.get("data_fine")
             nome = request.form.get("nome")
@@ -335,19 +335,19 @@ def save_fototrappola():
             intersezioni = request.form.get("intersezioni")
 
             # 2️⃣ Validazione minima (puoi ampliarla)
-            if not codice or not typo:
+            if not codice or not tipo:
                 flash("Codice e Tipo sono obbligatori", "error")
                 return redirect(url_for("nuova_fototrappola"))
 
             # 3️⃣ Query SQL parametrizzata (sicura contro SQL injection)
             query = text("""
                 INSERT INTO fototrappole (
-                    codice, typo, data_inizio, data_fine, nome, cognome,
+                    codice, tipo, data_inizio, data_fine, nome, cognome,
                     regione, provincia, comune, country,
                     latitudine, longitudine, altitudine, intersezioni, operator
                 )
                 VALUES (
-                    :codice, :typo, :data_inizio, :data_fine, :nome, :cognome,
+                    :codice, :tipo, :data_inizio, :data_fine, :nome, :cognome,
                     :regione, :provincia, :comune, :country,
                     :latitudine, :longitudine, :altitudine, :intersezioni, :operator
                 )
@@ -359,7 +359,7 @@ def save_fototrappola():
                     query,
                     {
                         "codice": codice,
-                        "typo": typo,
+                        "tipo": tipo,
                         "data_inizio": data_inizio,
                         "data_fine": data_fine if data_fine != "" else None,
                         "nome": nome,
