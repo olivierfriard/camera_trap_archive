@@ -10,6 +10,7 @@
         />
     </head>
     <body>
+        <main>
         <section class="section">
             <div class="container">
                 <div class="columns is-centered">
@@ -57,6 +58,11 @@
                                     >Nuova fototrappola</a
                                 >
 
+                                <a
+                                    class="button is-primary is-large"
+                                    href="{{ url_for('elenco_fototrappole') }}"
+                                    >Elenco fototrappole</a
+                                >
 
                             </div>
                         </div>
@@ -66,12 +72,14 @@
                             >Logout</a
                         >
 
-                        <p class="has-text-centered">
-                            &copy; {{ current_year }} Università di Torino
-                        </p>
-                    </div>
+
+                </div>
                 </div>
             </div>
         </section>
+        </main>
+
+        {% include "footer.html" %}
+
     </body>
 </html>

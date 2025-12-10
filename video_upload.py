@@ -65,26 +65,6 @@ def upload_video_form():
     return render_template("upload_video.html")
 
 
-@app.route(APP_ROOT + "/sighting_list")
-@login_required
-def sighting_list():
-    with engine.connect() as conn:
-        query = text(
-            "SELECT code, operator, camtrap_id, image FROM sighting, media WHERE sighting.id=media.sighting_id AND operator = :operator"
-        )
-        rows = conn.execute(query, {"operator": session["username"]}).mappings().all()
-    results = []
-    for row in rows:
-        results.append(
-            {
-                # "image": base64.b64encode(row["image"]).decode("ascii"),
-                "data_uri": f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}",
-                "code": row["code"],
-            }
-        )
-    return render_template("sighting_list.html", sightings=results)
-
-
 @app.route(APP_ROOT + "/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -111,6 +91,20 @@ def logout():
     session.pop("username", None)
     flash("Logout effettuato.", "success")
     return redirect(url_for("login"))
+
+
+@app.route(APP_ROOT + "/elenco_fototrappole", methods=["GET"])
+@login_required
+def elenco_fototrappole():
+    """
+    elenco fototrappola
+    """
+    with engine.connect() as conn:
+        sql = text("SELECT * FROM fototrappole WHERE operator = :operator")
+        fototrappole = (
+            conn.execute(sql, {"operator": session["username"]}).mappings().all()
+        )
+    return render_template("elenco_fototrappole.html", fototrappole=fototrappole)
 
 
 def extract_frame(video_path, time_sec):
@@ -151,178 +145,6 @@ def nuova_fototrappola():
     """
     if request.method == "GET":
         return render_template("nuova_fototrappola.html")
-
-
-@app.route(APP_ROOT + "/save_fototrappola", methods=["POST"])
-@login_required
-def save_fototrappola():
-    """
-    save nuova fototrappola
-    """
-    if request.method == "POST":
-        try:
-            # 1️⃣  Recupero dati dalla form
-            codice = request.form.get("codice")
-            typo = request.form.get("typo")
-            data_inizio = request.form.get("data_inizio")
-            data_fine = request.form.get("data_fine")
-            nome = request.form.get("nome")
-            cognome = request.form.get("cognome")
-            regione = request.form.get("regione")
-            provincia = request.form.get("provincia")
-            comune = request.form.get("comune")
-            country = request.form.get("country", "Italia")
-            latitudine = request.form.get("latitudine")
-            longitudine = request.form.get("longitudine")
-            altitudine = request.form.get("altitudine")
-            intersezioni = request.form.get("intersezioni")
-
-            # 2️⃣ Validazione minima (puoi ampliarla)
-            if not codice or not typo:
-                flash("Codice e Tipo sono obbligatori", "error")
-                return redirect(url_for("nuova_fototrappola"))
-
-            # 3️⃣ Query SQL parametrizzata (sicura contro SQL injection)
-            query = text("""
-                INSERT INTO fototrappole (
-                    codice, typo, data_inizio, data_fine, nome, cognome,
-                    regione, provincia, comune, country,
-                    latitudine, longitudine, altitudine, intersezioni
-                )
-                VALUES (
-                    :codice, :typo, :data_inizio, :data_fine, :nome, :cognome,
-                    :regione, :provincia, :comune, :country,
-                    :latitudine, :longitudine, :altitudine, :intersezioni
-                )
-            """)
-
-            # 4️⃣ Esecuzione query
-            with engine.connect() as conn:
-                conn.execute(
-                    query,
-                    {
-                        "codice": codice,
-                        "typo": typo,
-                        "data_inizio": data_inizio,
-                        "data_fine": data_fine if data_fine != "" else None,
-                        "nome": nome,
-                        "cognome": cognome,
-                        "regione": regione,
-                        "provincia": provincia,
-                        "comune": comune,
-                        "country": country,
-                        "latitudine": float(latitudine),
-                        "longitudine": float(longitudine),
-                        "altitudine": float(altitudine) if altitudine else None,
-                        "intersezioni": intersezioni,
-                    },
-                )
-
-                conn.commit()
-
-            flash("Nuova fototrappola inserita con successo!", "success")
-            return redirect(url_for("index"))
-
-        except Exception as e:
-            raise
-            print("Errore INSERT fototrappola:", e)
-            flash("Errore durante il salvataggio.", "error")
-            return redirect(url_for("nuova_fototrappola"))
-
-
-@app.route(APP_ROOT + "/upload_video", methods=["POST"])
-@login_required
-def upload_video():
-    """
-    save video
-    extract time and date info
-    rename video
-    """
-
-    video = request.files.get("video")
-
-    if not video:
-        flash("Nessun file video caricato!", "danger")
-        return redirect(url_for("index"))
-
-    # compute MD5 incrementally
-    md5 = hashlib.md5()
-    chunk_size = 8192  # 8 KB
-
-    # Read the file stream in chunks
-    for chunk in iter(lambda: video.stream.read(chunk_size), b""):
-        md5.update(chunk)
-    video.stream.seek(0)
-    file_content_md5 = md5.hexdigest()
-    print(file_content_md5)
-
-    # check if md5 already in DB
-    with engine.connect() as conn:
-        query = text(
-            "SELECT code, operator, camtrap_id FROM media,sighting WHERE sighting.id = media.sighting_id AND file_content_md5 = :file_content_md5"
-        )
-        row = (
-            conn.execute(query, {"file_content_md5": file_content_md5})
-            .mappings()
-            .fetchone()
-        )
-        print(row)
-        if row is not None:
-            flash(
-                f"Il file {video.filename} è già presente nel database: {row['operator']}, {row['code']}, {row['camtrap_id']}",
-                "danger",
-            )
-            return redirect(url_for("upload_video_form"))
-
-    original_file_name = secure_filename(video.filename)
-    print(f"{original_file_name=}")
-
-    # get new file name
-    new_file_name = Path(f"{int(time.time())}_{session['username']}").with_suffix(
-        Path(original_file_name).suffix
-    )
-    print(f"{new_file_name=}")
-
-    save_path = Path(app.config["UPLOAD_FOLDER"]) / new_file_name
-    video.save(save_path)
-
-    # md5 of file content
-    # file_content_md5 = hashlib.md5(open(save_path, "rb").read()).hexdigest()
-    # print(file_content_md5)
-
-    video_url = url_for("uploaded_file", filename=new_file_name)
-    flash(f"Video caricato con successo!", "success")
-
-    # check date time
-    data = camtrap_banner_decoder.extract_date_time(save_path)
-    if "error" not in data:
-        print(f"{data=}")
-        code: str = ""
-        if data["date"]:
-            code = data["date"][2:].replace("-", "") + session["code"]
-        else:
-            code = session["code"]
-        try:
-            time_ = data["time"][:2] + ":" + data["time"][2:4] + ":" + data["time"][4:6]
-        except Exception:
-            time_ = data["time"]
-    else:
-        code = ""
-        time_ = ""
-
-    print(session["fullname"])
-
-    return render_template(
-        "upload_info.html",
-        original_file_name=original_file_name,
-        new_file_name=str(new_file_name),
-        video_url=video_url,
-        operator=session["fullname"],
-        code=code,
-        date=data["date"],
-        time_=time_,
-        file_content_md5=file_content_md5,
-    )
 
 
 @app.route(APP_ROOT + "/save_info", methods=["POST"])
@@ -435,6 +257,210 @@ def save_info():
         flash("Avistamento salvato.", "success")
 
     return redirect(url_for("index"))
+
+
+@app.route(APP_ROOT + "/save_fototrappola", methods=["POST"])
+@login_required
+def save_fototrappola():
+    """
+    save nuova fototrappola
+    """
+    if request.method == "POST":
+        try:
+            # 1️⃣  Recupero dati dalla form
+            codice = request.form.get("codice")
+            typo = request.form.get("typo")
+            data_inizio = request.form.get("data_inizio")
+            data_fine = request.form.get("data_fine")
+            nome = request.form.get("nome")
+            cognome = request.form.get("cognome")
+            regione = request.form.get("regione")
+            provincia = request.form.get("provincia")
+            comune = request.form.get("comune")
+            country = request.form.get("country", "Italia")
+            latitudine = request.form.get("latitudine")
+            longitudine = request.form.get("longitudine")
+            altitudine = request.form.get("altitudine")
+            intersezioni = request.form.get("intersezioni")
+
+            # 2️⃣ Validazione minima (puoi ampliarla)
+            if not codice or not typo:
+                flash("Codice e Tipo sono obbligatori", "error")
+                return redirect(url_for("nuova_fototrappola"))
+
+            # 3️⃣ Query SQL parametrizzata (sicura contro SQL injection)
+            query = text("""
+                INSERT INTO fototrappole (
+                    codice, typo, data_inizio, data_fine, nome, cognome,
+                    regione, provincia, comune, country,
+                    latitudine, longitudine, altitudine, intersezioni, operator
+                )
+                VALUES (
+                    :codice, :typo, :data_inizio, :data_fine, :nome, :cognome,
+                    :regione, :provincia, :comune, :country,
+                    :latitudine, :longitudine, :altitudine, :intersezioni, :operator
+                )
+            """)
+
+            # 4️⃣ Esecuzione query
+            with engine.connect() as conn:
+                conn.execute(
+                    query,
+                    {
+                        "codice": codice,
+                        "typo": typo,
+                        "data_inizio": data_inizio,
+                        "data_fine": data_fine if data_fine != "" else None,
+                        "nome": nome,
+                        "cognome": cognome,
+                        "regione": regione,
+                        "provincia": provincia,
+                        "comune": comune,
+                        "country": country,
+                        "latitudine": float(latitudine),
+                        "longitudine": float(longitudine),
+                        "altitudine": float(altitudine) if altitudine else None,
+                        "intersezioni": intersezioni,
+                        "operator": session["username"],
+                    },
+                )
+
+                conn.commit()
+
+            flash("Nuova fototrappola inserita con successo!", "success")
+            return redirect(url_for("index"))
+
+        except Exception as e:
+            raise
+            print("Errore INSERT fototrappola:", e)
+            flash("Errore durante il salvataggio.", "error")
+            return redirect(url_for("nuova_fototrappola"))
+
+
+@app.route(APP_ROOT + "/sighting_list")
+@login_required
+def sighting_list():
+    with engine.connect() as conn:
+        query = text(
+            "SELECT code, operator, camtrap_id, image FROM sighting, media WHERE sighting.id=media.sighting_id AND operator = :operator"
+        )
+        rows = conn.execute(query, {"operator": session["username"]}).mappings().all()
+    results = []
+    for row in rows:
+        results.append(
+            {
+                # "image": base64.b64encode(row["image"]).decode("ascii"),
+                "data_uri": f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}",
+                "code": row["code"],
+            }
+        )
+    return render_template("sighting_list.html", sightings=results)
+
+
+@app.route(APP_ROOT + "/upload_video", methods=["POST"])
+@login_required
+def upload_video():
+    """
+    save video
+    extract time and date info
+    rename video
+    """
+
+    video = request.files.get("video")
+
+    if not video:
+        flash("Nessun file video caricato!", "danger")
+        return redirect(url_for("index"))
+
+    # compute MD5 incrementally
+    md5 = hashlib.md5()
+    chunk_size = 8192  # 8 KB
+
+    # Read the file stream in chunks
+    for chunk in iter(lambda: video.stream.read(chunk_size), b""):
+        md5.update(chunk)
+    video.stream.seek(0)
+    file_content_md5 = md5.hexdigest()
+    print(file_content_md5)
+
+    # check if md5 already in DB
+    with engine.connect() as conn:
+        query = text(
+            "SELECT code, operator, camtrap_id FROM media,sighting WHERE sighting.id = media.sighting_id AND file_content_md5 = :file_content_md5"
+        )
+        row = (
+            conn.execute(query, {"file_content_md5": file_content_md5})
+            .mappings()
+            .fetchone()
+        )
+        print(row)
+        if row is not None:
+            flash(
+                f"Il file {video.filename} è già presente nel database: {row['operator']}, {row['code']}, {row['camtrap_id']}",
+                "danger",
+            )
+            return redirect(url_for("upload_video_form"))
+
+    original_file_name = secure_filename(video.filename)
+    print(f"{original_file_name=}")
+
+    # get new file name
+    new_file_name = Path(f"{int(time.time())}_{session['username']}").with_suffix(
+        Path(original_file_name).suffix
+    )
+    print(f"{new_file_name=}")
+
+    save_path = Path(app.config["UPLOAD_FOLDER"]) / new_file_name
+    video.save(save_path)
+
+    # md5 of file content
+    # file_content_md5 = hashlib.md5(open(save_path, "rb").read()).hexdigest()
+    # print(file_content_md5)
+
+    video_url = url_for("uploaded_file", filename=new_file_name)
+    flash("Video caricato con successo!", "success")
+
+    # check date time
+    data = camtrap_banner_decoder.extract_date_time(save_path)
+    if "error" not in data:
+        print(f"{data=}")
+        code: str = ""
+        if data["date"]:
+            code = data["date"][2:].replace("-", "") + session["code"]
+        else:
+            code = session["code"]
+        try:
+            time_ = data["time"][:2] + ":" + data["time"][2:4] + ":" + data["time"][4:6]
+        except Exception:
+            time_ = data["time"]
+    else:
+        code = ""
+        time_ = ""
+
+    print(session["fullname"])
+
+    with engine.connect() as conn:
+        fototrappole = (
+            conn.execute(
+                text("SELECT codice FROM fototrappole WHERE operator = :operator"),
+                {"operator": session["username"]},
+            )
+            .mappings()
+            .all()
+        )
+
+    return render_template(
+        "upload_info.html",
+        original_file_name=original_file_name,
+        new_file_name=str(new_file_name),
+        video_url=video_url,
+        operator=session["fullname"],
+        code=code,
+        date=data["date"],
+        time_=time_,
+        file_content_md5=file_content_md5,
+        fototrappole=fototrappole,
+    )
 
 
 @app.route(APP_ROOT + "/uploads/<filename>")

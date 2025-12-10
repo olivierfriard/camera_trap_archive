@@ -114,6 +114,16 @@
                             <div class="field">
                                 <label class="label">ID fototrappola</label>
                                 <div class="control">
+                                <div class="select">
+
+                                        <select id="codice_fototrappola"     name="codice_fototrappola"          required       >
+                                         <option value="">Seleziona un codice</option>
+                                         {% for foto in fototrappole %}
+                                         <option value="{{ foto }}">{{ foto.codice }}</option>
+                                         {% endfor %}
+                                     </select>
+
+                                    </div>
                                     <input
                                         class="input"
                                         name="camtrap_id"
@@ -164,7 +174,7 @@
                                 >scalp: {{ scalp }}
                                 <div class="control">
                                     <div class="select">
-                                        <select
+                                           <select
                                             id="scalp"
                                             name="scalp"
                                             required
