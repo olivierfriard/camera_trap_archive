@@ -30,6 +30,10 @@
                 border-radius: 8px;
             }
         </style>
+
+        <!-- HTMX -->
+           <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
     </head>
     <body>
         <section class="section">
@@ -110,25 +114,44 @@
                         </div>
                     </div>
                     <div class="columns is-multiline">
-                        <div class="column is-half">
+                        <div class="column is-third">
                             <div class="field">
                                 <label class="label">ID fototrappola</label>
                                 <div class="control">
-                                <div class="select">
+                                    <div class="select">
 
-                                        <select id="codice_fototrappola"     name="codice_fototrappola"          required       >
+                                    <!--    <select id="codice_fototrappola"     name="codice_fototrappola"          required       >
                                          <option value="">Seleziona un codice</option>
                                          {% for foto in fototrappole %}
                                          <option value="{{ foto }}">{{ foto.codice }}</option>
                                          {% endfor %}
                                      </select>
+-->
+                                     <select name="camtrap_id"
+                                         hx-get="/get_fototrappola_data"
+                                         hx-trigger="change"
+                                        hx-target="#details"
+                                         hx-include="this"
+                                     >
+                                         <option value="">-- scegli una fototrappola --</option>
+                                         {% for foto in fototrappole %}
+                                         <option value="{{ foto.codice }}" {% if camtrap_id==foto.codice %}selected{%endif%}>{{ foto.codice }}</option>
+                                         {% endfor %}
+                                     </select>
 
                                     </div>
-                                    <input class="input" name="camtrap_id" type="text" required value="{{ camtrap_id }}" />
-                                </div>
+
+                                   <!-- <input class="input" name="camtrap_id" type="text" required value="{{ camtrap_id }}" /> -->
+
+                            </div>
                             </div>
                         </div>
-                        <div class="column is-half">
+                        <div class="column is-third">
+                            <div id="details" class="box">
+                                   {{ fototrappola_details }}
+                             </div>
+                        </div>
+                        <div class="column is-third">
                             <div class="field">
                                 <label class="label">Codice avistamento</label>
                                 <div class="control">
@@ -168,34 +191,10 @@
                                 >scalp: {{ scalp }}
                                 <div class="control">
                                     <div class="select">
-                                           <select
-                                            id="scalp"
-                                            name="scalp"
-                                            required
-                                        >
-                                            <option value="">
-                                                Seleziona un codice
-                                            </option>
-                                            <option
-                                                value="C1"
-                                                {%
-                                                if
-                                                scalp=="C1"
-                                                %}selected{%endif%}
-                                            >
-                                                C1
-                                            </option>
-                                            <option
-                                                value="C3"
-                                                {%
-                                                if
-                                                scalp=="C3"
-                                                %}selected{%
-                                                endif
-                                                %}
-                                            >
-                                                C3
-                                            </option>
+                                           <select id="scalp" name="scalp" required>
+                                            <option value="">Seleziona un codice</option>
+                                            <option value="C1" {% if scalp=="C1" %}selected{%endif%}>C1</option>
+                                            <option value="C3" {% if scalp=="C3"  %}selected{%endif%}>C3</option>
                                         </select>
                                     </div>
                                 </div>
@@ -216,58 +215,6 @@
                         </div>
                     </div>
 
-                    <!--
-                    <div class="columns is-multiline">
-                        <div class="column is-one-third">
-                            <div class="field">
-                                <label class="label">Latitudine</label>
-                                <div class="control">
-                                    <input
-                                        class="input"
-                                        id="latDisplay"
-                                        readonly
-                                        name="latitude"
-                                        value="{{ latitude }}"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                        <div class="column is-one-third">
-                            <div class="field">
-                                <label class="label">Longitudine</label>
-                                <div class="control">
-                                    <input
-                                        class="input"
-                                        id="lngDisplay"
-                                        readonly
-                                        name="longitude"
-                                        value="{{ longitude }}"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="column is-one-third">
-                            <div class="field">
-                                <label class="label">Codice transetto</label>
-                                <div class="control">
-                                    <input
-                                        class="input"
-                                        name="transect_id"
-                                        value="{{ transect_id }}"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <p class="help">
-                        Clicca sulla mappa per impostare le coordinate della
-                        fototrappola.
-                    </p>
-
-                    <div id="map" class="mb-4"></div>
--->
                     <div class="field is-grouped">
                         <div class="control">
                             <button class="button is-primary" type="submit">
@@ -277,69 +224,12 @@
                     </div>
                 </form>
 
-                <br /><br />
-                <a
-                    class="button is-warning is-small"
-                    href="{{ url_for('logout') }}"
-                    >Logout</a
-                >
+
+
             </div>
         </section>
 
-        <script
-            src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            crossorigin=""
-        ></script>
-        <script>
-            const map = L.map("map").setView([45.065, 7.68], 13);
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                maxZoom: 19,
-                attribution: "© OpenStreetMap",
-            }).addTo(map);
 
-            let marker = null;
 
-            function setPosition(lat, lng) {
-                document.getElementById("latDisplay").value = lat.toFixed(6);
-                document.getElementById("lngDisplay").value = lng.toFixed(6);
-            }
-
-            map.on("click", (e) => {
-                const { lat, lng } = e.latlng;
-                if (!marker) {
-                    marker = L.marker([lat, lng], { draggable: true }).addTo(
-                        map,
-                    );
-                    marker.on("dragend", (ev) => {
-                        const p = ev.target.getLatLng();
-                        setPosition(p.lat, p.lng);
-                    });
-                } else {
-                    marker.setLatLng([lat, lng]);
-                }
-                setPosition(lat, lng);
-            });
-        </script>
-
-        <script>
-            const video = document.getElementById("video_camtrap");
-
-            // Hide controls initially
-            video.controls = false;
-
-            // Show controls when user clicks or hovers
-            video.addEventListener("mouseenter", () => {
-                video.controls = true;
-            });
-
-            video.addEventListener("mouseleave", () => {
-                video.controls = false; // hide controls when mouse leaves and video is playing
-            });
-
-            // Optional: show controls when video is paused
-            video.addEventListener("pause", () => {
-                video.controls = true;
-            });
-        </script>
     </body>
 </html>

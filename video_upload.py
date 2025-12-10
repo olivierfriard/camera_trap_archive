@@ -137,6 +137,29 @@ def extract_frame(video_path, time_sec):
     cap.release()
 
 
+@app.route("/get_fototrappola_data", methods=["GET"])
+def get_fototrappola_data():
+    camtrap_id = request.args.get("camtrap_id")
+    if not camtrap_id:
+        return ""
+    print(f"{camtrap_id=}")
+    with engine.connect() as conn:
+        fototrappola = (
+            conn.execute(
+                text("SELECT * FROM fototrappole WHERE codice = :codice"),
+                {"codice": camtrap_id},
+            )
+            .mappings()
+            .fetchone()
+        )
+    out = (
+        f"{fototrappola.tipo}<br>{fototrappola.nome} {fototrappola.cognome}<br>"
+        f"{fototrappola.comune} {fototrappola.provincia} {fototrappola.regione}"
+    )
+
+    return out
+
+
 @app.route(APP_ROOT + "/nuova_fototrappola", methods=["GET", "POST"])
 @login_required
 def nuova_fototrappola():
@@ -184,6 +207,32 @@ def save_info():
                 ),
                 "danger",
             )
+
+            # list of fototrappole
+            with engine.connect() as conn:
+                fototrappole = (
+                    conn.execute(
+                        text(
+                            "SELECT codice FROM fototrappole WHERE operator = :operator"
+                        ),
+                        {"operator": session["username"]},
+                    )
+                    .mappings()
+                    .all()
+                )
+
+                fototrappola = (
+                    conn.execute(
+                        text("SELECT * FROM fototrappole WHERE codice = :camtrap_id"),
+                        {"camtrap_id": camtrap_id},
+                    )
+                    .mappings()
+                    .fetchone()
+                )
+                fototrappola_details = (
+                    f"{fototrappola.tipo}<br>{fototrappola.nome} {fototrappola.cognome}<br>"
+                    f"{fototrappola.comune} {fototrappola.provincia} {fototrappola.regione}"
+                )
             return render_template(
                 "upload_info.html",
                 original_file_name=original_file_name,
@@ -196,11 +245,13 @@ def save_info():
                 file_content_md5=file_content_md5,
                 camtrap_id=camtrap_id,
                 wolf_number=wolf_number,
-                notes=notes,
+                notes=notes if notes is not None else "",
                 latitude=latitude,
                 longitude=longitude,
                 transect_id=transect_id if transect_id is not None else "",
                 scalp=scalp,
+                fototrappole=fototrappole,
+                fototrappola_details=Markup(fototrappola_details),
             )
 
         query = text("""
@@ -439,6 +490,7 @@ def upload_video():
 
     print(session["fullname"])
 
+    # list of fototrappole
     with engine.connect() as conn:
         fototrappole = (
             conn.execute(

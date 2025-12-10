@@ -28,12 +28,18 @@
                                 <tr><th>Codice</th>
                                     <th>Tipo</th>
                                 <th>Nome</th>
+                                <th>Data installazione</th>
+                                <th>Intersezione</th>
+                                <th>Coordinate</th>
                                 </tr>
                             </thead>
                             {% for foto in fototrappole %}
                             <tr><td>{{ foto.codice }}</td>
                             <td>{{ foto.tipo }}</td>
                             <td>{{ foto.nome }} {{ foto.cognome }}</td>
+                            <td>{{ foto.data_inizio }}</td>
+                            <td>{{ foto.intersezione }}</td>
+                            <td>{{ foto.latitudine }} {{ foto.longitudine }}</td>
                             </tr>
 
                             {% endfor %}
