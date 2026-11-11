@@ -61,8 +61,6 @@ __version__ = "0.0.2"
 EXTENSIONS = {".avi", ".mp4", ".jpg", ".jpeg"}
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
-current_app.logger.info(pytesseract.get_tesseract_version())
-
 
 def banner_text_from_frame(
     frame, roi_height_fraction: float = 0.15, debug=False, file_path=""
@@ -70,6 +68,7 @@ def banner_text_from_frame(
     """
     extract text from frame banner
     """
+    current_app.logger.info(pytesseract.get_tesseract_version())
 
     extracted_text = None
     # Get frame dimensions
