@@ -99,9 +99,8 @@ def banner_text_from_frame(
     # Apply OCR to extract text
     try:
         extracted_text = pytesseract.image_to_string(roi_gray, config="--psm 6")
-    except Exception:
-        print("Tesseract error")
-        sys.exit()
+    except Exception as e:
+        return f"###ERROR: {e}"
 
     if debug:
         print(f"{extracted_text=}")
@@ -177,6 +176,9 @@ def extract_date_time(path_file, debug=False):
 
     if Path(path_file).suffix.lower() in (".jpg", ".jpeg"):
         banner_text = extract_banner_text_from_image(path_file, debug=debug)
+
+    if banner_text.start_with("###ERROR"):
+        return {"error": "banner_text"}
 
     if banner_text is None:
         return {"error": ""}
