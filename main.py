@@ -49,18 +49,18 @@ app = Flask(__name__)
 app.secret_key = APP_SECRET_KEY  # cambia in produzione
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+
+# Logger applicatif
 handler = WatchedFileHandler(LOG_FILE, encoding="utf-8")
 handler.setFormatter(
     logging.Formatter(
         "%(asctime)s [%(process)d] [%(levelname)s] %(module)s:%(lineno)d - %(message)s"
     )
 )
-handler.setLevel(logging.INFO)
 app.logger.addHandler(handler)
 app.logger.setLevel(logging.INFO)
-
-# do not propagate event to parent log
 app.logger.propagate = False
+
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
