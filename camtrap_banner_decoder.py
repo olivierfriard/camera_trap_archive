@@ -177,7 +177,7 @@ def extract_date_time(path_file, debug=False):
     if Path(path_file).suffix.lower() in (".jpg", ".jpeg"):
         banner_text = extract_banner_text_from_image(path_file, debug=debug)
 
-    if banner_text.start_with("###ERROR"):
+    if banner_text.startswith("###ERROR"):
         return {"error": "banner_text"}
 
     if banner_text is None:
