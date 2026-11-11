@@ -37,6 +37,7 @@ DATABASE_URL = config["db_url"]
 APP_ROOT = config["app_root"]
 UPLOAD_FOLDER = config["upload_folder"]
 APP_SECRET_KEY = config["app_secret_key"]
+DEBUG = bool(int(config["debug"]))
 
 app = Flask(__name__)
 app.secret_key = APP_SECRET_KEY  # cambia in produzione
@@ -559,4 +560,4 @@ def view(sighting_id: int):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=DEBUG, host="0.0.0.0", port=5000)
