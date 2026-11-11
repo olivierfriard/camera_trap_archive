@@ -2,3 +2,4 @@
 uploads
 __pycache__
 users.py
+.env

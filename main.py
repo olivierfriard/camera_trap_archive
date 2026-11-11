@@ -1,10 +1,12 @@
 import base64
 import hashlib
 import os
+import sys
 import time
 from pathlib import Path
 
 import cv2
+from dotenv import dotenv_values
 from flask import (
     Flask,
     flash,
@@ -22,18 +24,32 @@ from werkzeug.utils import secure_filename
 import camtrap_banner_decoder
 import users
 
+config_filename = Path(__file__).with_name(".env")
+
+if not config_filename.is_file():
+    print(".env not found")
+    sys.exit()
+
+config = dotenv_values(config_filename)
+
+config["config_dir"] = Path(config_filename).parent
+DATABASE_URL = config["db_url"]
+APP_ROOT = config["app_root"]
+UPLOAD_FOLDER = config["upload_folder"]
+APP_SECRET_KEY = config["app_secret_key"]
+
 app = Flask(__name__)
-app.secret_key = "secret-key"  # cambia in produzione
-UPLOAD_FOLDER = "uploads"
+app.secret_key = APP_SECRET_KEY  # cambia in produzione
+# UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-APP_ROOT = "/fototrappole"
+# APP_ROOT = "/fototrappole"
 
 # PostgreSQL connection
-DATABASE_URL = "postgresql://sighting_user@localhost:5433/sighting"
+# DATABASE_URL = "postgresql://sighting_user@localhost:5433/sighting"
 engine = create_engine(DATABASE_URL)
 
 USERS = users.USERS
@@ -382,7 +398,6 @@ def save_fototrappola():
             return redirect(url_for("index"))
 
         except Exception as e:
-            raise
             print("Errore INSERT fototrappola:", e)
             flash("Errore durante il salvataggio.", "error")
             return redirect(url_for("nuova_fototrappola"))
