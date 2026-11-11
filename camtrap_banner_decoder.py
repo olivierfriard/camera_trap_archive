@@ -54,6 +54,7 @@ from pathlib import Path
 
 import cv2
 import pytesseract
+from flask import current_app
 
 __version__ = "0.0.2"
 
@@ -72,7 +73,9 @@ def banner_text_from_frame(
     frame_height, frame_width, _ = frame.shape
 
     if debug:
-        print(f"image original dimention: {frame_height}x{frame_width}")
+        current_app.logger.info(
+            f"image original dimention: {frame_height}x{frame_width}"
+        )
 
     if frame_width > 2592:
         aspect_ratio = frame_height / frame_width
@@ -82,7 +85,9 @@ def banner_text_from_frame(
         frame_height, frame_width, _ = frame.shape
 
         if debug:
-            print(f"image resized dimention: {frame_height}x{frame_width}")
+            current_app.logger.info(
+                f"image resized dimention: {frame_height}x{frame_width}"
+            )
 
     # Define the region of interest (ROI)
     roi_height = int(frame_height * roi_height_fraction)
@@ -100,10 +105,11 @@ def banner_text_from_frame(
     try:
         extracted_text = pytesseract.image_to_string(roi_gray, config="--psm 6")
     except Exception as e:
+        current_app.logger.info(f"###ERROR: {e}")
         return f"###ERROR: {e}"
 
     if debug:
-        print(f"{extracted_text=}")
+        current_app.logger.info(f"{extracted_text=}")
 
     return extracted_text
 
