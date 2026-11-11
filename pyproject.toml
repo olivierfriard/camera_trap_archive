@@ -5,6 +5,7 @@ requires-python = ">=3.13"
 dependencies = [
     "dotenv>=0.9.9",
     "flask>=3.1.2",
+    "gunicorn>=27.0.0",
     "opencv-python-headless>=4.12.0.88",
     "psycopg2>=2.9.11",
     "psycopg2-binary>=2.9.11",
