@@ -1,8 +1,14 @@
+"""
+camera trap archive service
+"""
+
 import base64
 import hashlib
+import logging
 import os
 import sys
 import time
+from logging.handlers import WatchedFileHandler
 from pathlib import Path
 
 import cv2
@@ -37,10 +43,24 @@ APP_ROOT = config["app_root"]
 UPLOAD_FOLDER = config["upload_folder"]
 APP_SECRET_KEY = config["app_secret_key"]
 DEBUG = bool(int(config["debug"]))
+LOG_FILE = config["log_file"]
 
 app = Flask(__name__)
 app.secret_key = APP_SECRET_KEY  # cambia in produzione
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+handler = WatchedFileHandler(LOG_FILE, encoding="utf-8")
+handler.setFormatter(
+    logging.Formatter(
+        "%(asctime)s [%(process)d] [%(levelname)s] %(module)s:%(lineno)d - %(message)s"
+    )
+)
+handler.setLevel(logging.INFO)
+app.logger.addHandler(handler)
+app.logger.setLevel(logging.INFO)
+
+# do not propagate event to parent log
+app.logger.propagate = False
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -432,6 +452,7 @@ def upload_video():
     video = request.files.get("video")
 
     if not video:
+        app.logger.info("Nessun file video caricato")
         flash("Nessun file video caricato!", "danger")
         return redirect(url_for("index"))
 
@@ -444,7 +465,7 @@ def upload_video():
         md5.update(chunk)
     video.stream.seek(0)
     file_content_md5 = md5.hexdigest()
-    print(f"{file_content_md5=}")  # remove before release
+    app.logger.info(f"{file_content_md5=}")
 
     # check if md5 already in DB
     with engine.connect() as conn:
@@ -456,7 +477,6 @@ def upload_video():
             .mappings()
             .fetchone()
         )
-        print(f"{row=}")  # remove before release
         if row is not None:
             flash(
                 f"Il file {video.filename} è già presente nel database: {row['operator']}, {row['code']}, {row['camtrap_id']}",
@@ -465,13 +485,14 @@ def upload_video():
             return redirect(url_for("upload_video_form"))
 
     original_file_name = secure_filename(video.filename)
-    print(f"{original_file_name=}")
+
+    app.logger.info(f"{original_file_name=}")
 
     # get new file name
     new_file_name = Path(f"{int(time.time())}_{session['username']}").with_suffix(
         Path(original_file_name).suffix
     )
-    print(f"{new_file_name=}")
+    app.logger.info(f"{new_file_name=}")
 
     save_path = Path(app.config["UPLOAD_FOLDER"]) / new_file_name
     video.save(save_path)
@@ -485,7 +506,7 @@ def upload_video():
 
     # check date time
     data = camtrap_banner_decoder.extract_date_time(save_path)
-    print(f"{data=}")
+    app.logger.info(f"{data=}")
 
     if "error" not in data:
         code: str = ""
