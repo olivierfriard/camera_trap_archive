@@ -45,7 +45,16 @@ APP_SECRET_KEY = config["app_secret_key"]
 DEBUG = bool(int(config["debug"]))
 LOG_FILE = config["log_file"]
 
-app = Flask(__name__)
+
+class MyFlask(Flask):
+    def log_exception(self, exc_info):
+        """send exceptions in Gunicorn logger."""
+        logging.getLogger("gunicorn.error").error(
+            "Exception during request", exc_info=exc_info
+        )
+
+
+app = MyFlask(__name__)
 app.secret_key = APP_SECRET_KEY  # cambia in produzione
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
