@@ -33,7 +33,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 APP_ROOT = "/fototrappole"
 
 # PostgreSQL connection
-DATABASE_URL = "postgresql://sighting_user@localhost:5432/sighting"
+DATABASE_URL = "postgresql://sighting_user@localhost:5433/sighting"
 engine = create_engine(DATABASE_URL)
 
 USERS = users.USERS
@@ -432,7 +432,7 @@ def upload_video():
         md5.update(chunk)
     video.stream.seek(0)
     file_content_md5 = md5.hexdigest()
-    print(file_content_md5)
+    print(f"{file_content_md5=}")  # remove before release
 
     # check if md5 already in DB
     with engine.connect() as conn:
@@ -444,7 +444,7 @@ def upload_video():
             .mappings()
             .fetchone()
         )
-        print(row)
+        print(f"{row=}")  # remove before release
         if row is not None:
             flash(
                 f"Il file {video.filename} è già presente nel database: {row['operator']}, {row['code']}, {row['camtrap_id']}",
@@ -473,8 +473,9 @@ def upload_video():
 
     # check date time
     data = camtrap_banner_decoder.extract_date_time(save_path)
+    print(f"{data=}")
+
     if "error" not in data:
-        print(f"{data=}")
         code: str = ""
         if data["date"]:
             code = data["date"][2:].replace("-", "") + session["code"]
