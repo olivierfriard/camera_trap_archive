@@ -59,6 +59,9 @@ from flask import current_app
 __version__ = "0.0.2"
 
 EXTENSIONS = {".avi", ".mp4", ".jpg", ".jpeg"}
+pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+
+current_app.logger.info(pytesseract.get_tesseract_version())
 
 
 def banner_text_from_frame(
