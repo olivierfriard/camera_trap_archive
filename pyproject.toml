@@ -3,6 +3,7 @@ name = "fototrappole"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
+    "dotenv>=0.9.9",
     "flask>=3.1.2",
     "opencv-python-headless>=4.12.0.88",
     "psycopg2>=2.9.11",
