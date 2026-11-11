@@ -32,7 +32,6 @@ if not config_filename.is_file():
 
 config = dotenv_values(config_filename)
 
-config["config_dir"] = Path(config_filename).parent
 DATABASE_URL = config["db_url"]
 APP_ROOT = config["app_root"]
 UPLOAD_FOLDER = config["upload_folder"]
@@ -41,16 +40,12 @@ DEBUG = bool(int(config["debug"]))
 
 app = Flask(__name__)
 app.secret_key = APP_SECRET_KEY  # cambia in produzione
-# UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# APP_ROOT = "/fototrappole"
-
 # PostgreSQL connection
-# DATABASE_URL = "postgresql://sighting_user@localhost:5433/sighting"
 engine = create_engine(DATABASE_URL)
 
 USERS = users.USERS
@@ -250,6 +245,7 @@ def save_info():
                     f"{fototrappola.tipo}<br>{fototrappola.nome} {fototrappola.cognome}<br>"
                     f"{fototrappola.comune} {fototrappola.provincia} {fototrappola.regione}"
                 )
+
             return render_template(
                 "upload_info.html",
                 original_file_name=original_file_name,
@@ -335,7 +331,7 @@ def save_fototrappola():
     """
     if request.method == "POST":
         try:
-            # 1️⃣  Recupero dati dalla form
+            # Recupero dati dalla form
             codice = request.form.get("codice")
             tipo = request.form.get("tipo")
             data_inizio = request.form.get("data_inizio")
@@ -351,12 +347,12 @@ def save_fototrappola():
             altitudine = request.form.get("altitudine")
             intersezioni = request.form.get("intersezioni")
 
-            # 2️⃣ Validazione minima (puoi ampliarla)
+            # Validazione minima (puoi ampliarla)
             if not codice or not tipo:
                 flash("Codice e Tipo sono obbligatori", "error")
                 return redirect(url_for("nuova_fototrappola"))
 
-            # 3️⃣ Query SQL parametrizzata (sicura contro SQL injection)
+            # Query SQL parametrizzata (sicura contro SQL injection)
             query = text("""
                 INSERT INTO fototrappole (
                     codice, tipo, data_inizio, data_fine, nome, cognome,
@@ -370,7 +366,7 @@ def save_fototrappola():
                 )
             """)
 
-            # 4️⃣ Esecuzione query
+            # Esecuzione query
             with engine.connect() as conn:
                 conn.execute(
                     query,
@@ -400,7 +396,7 @@ def save_fototrappola():
 
         except Exception as e:
             print("Errore INSERT fototrappola:", e)
-            flash("Errore durante il salvataggio.", "error")
+            flash(f"Errore durante il salvataggio {e}", "error")
             return redirect(url_for("nuova_fototrappola"))
 
 
