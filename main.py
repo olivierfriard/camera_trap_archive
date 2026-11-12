@@ -518,17 +518,7 @@ def upload_video():
     data = camtrap_banner_decoder.extract_date_time(
         save_path,
         Namespace(
-            input_directory="",
-            output_directory="",
-            pattern="*",
-            cam_id="NO",
-            rename="",
-            tesseract_cmd="tesseract",
-            ffmpeg_path="ffmpeg",
-            exiftool_path="exiftool",
-            reencode="",
             debug=False,
-            version=False,
         ),
     )
     app.logger.info(f"{data=}")
