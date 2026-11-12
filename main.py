@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 import time
+from argparse import Namespace
 from logging.handlers import WatchedFileHandler
 from pathlib import Path
 
@@ -514,22 +515,35 @@ def upload_video():
     flash("Video caricato con successo!", "success")
 
     # check date time
-    data = camtrap_banner_decoder.extract_date_time(save_path)
+    data = camtrap_banner_decoder.extract_date_time(
+        save_path,
+        Namespace(
+            input_directory="",
+            output_directory="",
+            pattern="*",
+            cam_id="NO",
+            rename="",
+            tesseract_cmd="tesseract",
+            ffmpeg_path="ffmpeg",
+            exiftool_path="exiftool",
+            reencode="",
+            debug=False,
+            version=False,
+        ),
+    )
     app.logger.info(f"{data=}")
 
-    if "error" not in data:
-        code: str = ""
-        if data["date"]:
-            code = data["date"][2:].replace("-", "") + session["code"]
-        else:
-            code = session["code"]
-        try:
-            time_ = data["time"][:2] + ":" + data["time"][2:4] + ":" + data["time"][4:6]
-        except Exception:
-            time_ = data["time"]
+    time_ = ""
+
+    code: str = ""
+    if data["date"]:
+        code = data["date"][2:].replace("-", "") + session["code"]
     else:
-        code = ""
-        time_ = ""
+        code = session["code"]
+    try:
+        time_ = data["time"][:2] + ":" + data["time"][2:4] + ":" + data["time"][4:6]
+    except Exception:
+        time_ = data["time"]
 
     print(session["fullname"])
 
