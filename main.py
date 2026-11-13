@@ -6,6 +6,7 @@ import base64
 import hashlib
 import logging
 import os
+import secrets
 import sys
 import time
 from argparse import Namespace
@@ -16,7 +17,9 @@ import cv2
 from dotenv import dotenv_values
 from flask import (
     Flask,
+    abort,
     flash,
+    g,
     redirect,
     render_template,
     request,
@@ -26,10 +29,11 @@ from flask import (
 )
 from markupsafe import Markup
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import camtrap_banner_decoder
-import users
 
 config_filename = Path(__file__).with_name(".env")
 
@@ -78,7 +82,16 @@ if not os.path.exists(UPLOAD_FOLDER):
 # PostgreSQL connection
 engine = create_engine(DATABASE_URL)
 
-USERS = users.USERS
+def get_user(username):
+    """Fetch an account and its access status from PostgreSQL."""
+    with engine.connect() as conn:
+        return conn.execute(
+            text(
+                "SELECT username, password_hash, fullname, institution, code, is_active, is_admin "
+                "FROM public.users WHERE username = :username"
+            ),
+            {"username": username},
+        ).mappings().fetchone()
 
 
 # --- Login required decorator ---
@@ -87,9 +100,15 @@ def login_required(f):
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if "username" not in session:
+        user = get_user(session["username"]) if "username" in session else None
+        if user is None or not user["is_active"]:
+            session.clear()
             flash("Devi effettuare il login per accedere a questa pagina.", "danger")
             return redirect(url_for("login"))
+        for field in ("username", "fullname", "institution", "code"):
+            session[field] = user[field]
+        session["is_admin"] = user["is_admin"]
+        g.current_user = user
         return f(*args, **kwargs)
 
     return decorated_function
@@ -99,6 +118,102 @@ def login_required(f):
 @login_required
 def index():
     return render_template("index.html")
+
+
+@app.route(APP_ROOT + "/administration", methods=["GET", "POST"])
+@login_required
+def administration():
+    """Manage accounts, checking current administrator privileges on each request."""
+    if not g.current_user["is_admin"]:
+        abort(403)
+    if "admin_csrf_token" not in session:
+        session["admin_csrf_token"] = secrets.token_urlsafe(32)
+
+    if request.method == "POST":
+        if not secrets.compare_digest(
+            session["admin_csrf_token"].encode(), request.form.get("csrf_token", "").encode()
+        ):
+            abort(400)
+        action = request.form.get("action")
+        if action not in ("create", "save", "deactivate", "reactivate"):
+            abort(400)
+        username = request.form.get("username", "").strip()
+        if not username:
+            abort(400)
+        values = {"username": username}
+        if action in ("create", "save"):
+            for field in ("fullname", "institution", "code"):
+                values[field] = request.form.get(field, "").strip()
+            password = request.form.get("password", "")
+            if not all(values.values()) or (action == "create" and not password):
+                flash("Compila tutti i campi obbligatori.", "danger")
+                return redirect(url_for("administration"))
+            values["is_admin"] = request.form.get("is_admin") == "1"
+            values["is_active"] = request.form.get("is_active") == "1"
+            if password:
+                values["password_hash"] = generate_password_hash(password)
+        try:
+            with engine.begin() as conn:
+                # Serialize account changes to protect the last active administrator.
+                conn.execute(text("LOCK TABLE public.users IN SHARE ROW EXCLUSIVE MODE"))
+                actor = conn.execute(
+                    text("SELECT is_active, is_admin FROM public.users WHERE username = :username"),
+                    {"username": session["username"]},
+                ).mappings().fetchone()
+                if actor is None or not actor["is_active"] or not actor["is_admin"]:
+                    abort(403)
+                if action == "create":
+                    conn.execute(text(
+                        "INSERT INTO public.users "
+                        "(username, password_hash, fullname, institution, code, is_active, is_admin) "
+                        "VALUES (:username, :password_hash, :fullname, :institution, :code, :is_active, :is_admin)"
+                    ), values)
+                else:
+                    target = conn.execute(
+                        text("SELECT is_active, is_admin FROM public.users WHERE username = :username"),
+                        {"username": username},
+                    ).mappings().fetchone()
+                    if target is None:
+                        abort(404)
+                    if action in ("deactivate", "reactivate"):
+                        values["is_active"] = action == "reactivate"
+                        values["is_admin"] = target["is_admin"]
+                    if target["is_admin"] and target["is_active"] and not (
+                        values["is_admin"] and values["is_active"]
+                    ):
+                        count = conn.execute(text(
+                            "SELECT count(*) FROM public.users WHERE is_active AND is_admin"
+                        )).scalar_one()
+                        if count <= 1:
+                            flash("Non puoi disattivare o rimuovere il ruolo dell'ultimo amministratore attivo.", "danger")
+                            return redirect(url_for("administration"))
+                    if action == "save":
+                        sql = (
+                            "UPDATE public.users SET fullname = :fullname, institution = :institution, "
+                            "code = :code, is_active = :is_active, is_admin = :is_admin"
+                        )
+                        if "password_hash" in values:
+                            sql += ", password_hash = :password_hash"
+                        sql += " WHERE username = :username"
+                    else:
+                        sql = "UPDATE public.users SET is_active = :is_active WHERE username = :username"
+                    conn.execute(text(sql), values)
+        except IntegrityError:
+            flash("Nome utente già esistente. Scegli un altro nome o riattiva il conto esistente.", "danger")
+        else:
+            flash("Utente creato." if action == "create" else "Utente aggiornato.", "success")
+        return redirect(url_for("administration"))
+
+    with engine.connect() as conn:
+        accounts = conn.execute(text(
+            "SELECT username, fullname, institution, code, is_active, is_admin "
+            "FROM public.users ORDER BY username"
+        )).mappings().all()
+    selected_username = request.args.get("username")
+    selected = next((user for user in accounts if user["username"] == selected_username), None)
+    if selected_username is not None and selected is None:
+        abort(404)
+    return render_template("administration.html", accounts=accounts, selected=selected)
 
 
 @app.route(APP_ROOT + "/upload_video_form")
@@ -111,12 +226,16 @@ def upload_video_form():
 def login():
     if request.method == "POST":
         username = request.form.get("username")
-        password = request.form.get("password")
-        if username in USERS and USERS[username]["pwd"] == password:
-            session["username"] = username
-            session["fullname"] = USERS[username]["fullname"]
-            session["institution"] = USERS[username]["institution"]
-            session["code"] = USERS[username]["code"]
+        password = request.form.get("password", "")
+        user = get_user(username)
+        if (
+            user is not None
+            and user["is_active"]
+            and check_password_hash(user["password_hash"], password)
+        ):
+            session.clear()
+            for field in ("username", "fullname", "institution", "code"):
+                session[field] = user[field]
 
             flash(
                 f"Benvenuto, {session['fullname']} ({session['institution']})!",
@@ -130,7 +249,7 @@ def login():
 
 @app.route(APP_ROOT + "/logout")
 def logout():
-    session.pop("username", None)
+    session.clear()
     flash("Logout effettuato.", "success")
     return redirect(url_for("login"))
 
@@ -580,11 +699,12 @@ def view(sighting_id: int):
         )
         row = conn.execute(query, {"sighting_id": sighting_id}).mappings().fetchone()
 
+    user = get_user(row["operator"])
     return render_template(
         "view.html",
         row=row,
-        user=USERS[row["operator"]]["fullname"],
-        institution=USERS[row["operator"]]["institution"],
+        user=user["fullname"],
+        institution=user["institution"],
         data_uri=f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}",
     )
 

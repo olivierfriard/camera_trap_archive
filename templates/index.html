@@ -41,6 +41,9 @@
                             {% endwith %}
                         <div class="box">
                             <div class="buttons is-centered">
+                                {% if session.get('is_admin') %}
+                                <a class="button is-link" href="{{ url_for('administration') }}">Amministrazione</a>
+                                {% endif %}
                                 <a
                                     class="button is-primary is-large"
                                     href="{{ url_for('upload_video_form') }}"
