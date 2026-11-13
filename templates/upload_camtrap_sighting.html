@@ -54,14 +54,35 @@
             </div>
             {% endif %}
             {% endwith %}
-            {% if video_url %}
+            {% if video_url or new_file_name %}
             <div class="box mt-5">
                 <h2 class="subtitle is-4">Anteprima video caricato</h2>
+                {% if video_url %}
                 <video id="video_camtrap" src="{{ video_url }}" width="720" preload="metadata" controls></video>
-                <p class="mt-3">
-                    <strong>Data:</strong> {{ date }}<br />
-                    <strong>Ora:</strong> {{ time_ }}<br />
-                </p>
+                {% else %}
+                <p class="notification is-warning">Anteprima non disponibile. Puoi comunque compilare e salvare i dati.</p>
+                <a class="button is-small" href="{{ url_for('uploaded_file', filename=new_file_name) }}" download>Scarica il video originale</a>
+                {% endif %}
+                <div class="columns mt-3">
+                    <div class="column is-half">
+                        <div class="field">
+                            <label class="label" for="sightingDate">Data</label>
+                            <div class="control">
+                                <input class="input" id="sightingDate" name="date" type="text" form="uploadForm" value="{{ date or '' }}" placeholder="AAAA-MM-GG" />
+                            </div>
+                            <p class="help">Formato AAAA-MM-GG.</p>
+                        </div>
+                    </div>
+                    <div class="column is-half">
+                        <div class="field">
+                            <label class="label" for="sightingTime">Ora</label>
+                            <div class="control">
+                                <input class="input" id="sightingTime" name="time_" type="text" form="uploadForm" value="{{ time_ or '' }}" placeholder="HH:MM:SS" />
+                            </div>
+                            <p class="help">Formato HH:MM o HH:MM:SS. Ora locale: {{ config['SIGHTING_TIMEZONE'] }}.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
             {% endif %}
 
@@ -69,8 +90,6 @@
                 <input type="hidden" name="original_file_name" value="{{ original_file_name }}" />
                 <input type="hidden" name="new_file_name" value="{{ new_file_name }}" />
                 <input type="hidden" name="file_content_md5" value="{{ file_content_md5 }}" />
-                <input type="hidden" name="date" value="{{ date }}" />
-                <input type="hidden" name="time_" value="{{ time_ }}" />
                 <div class="field">
                     <label class="label">Operatore</label>
                     <div class="control">

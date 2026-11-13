@@ -9,12 +9,16 @@ import logging
 import math
 import os
 import secrets
+import subprocess
 import sys
 import time
 from argparse import Namespace
+from datetime import datetime, timezone
 from io import StringIO
 from logging.handlers import WatchedFileHandler
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+from zoneinfo import ZoneInfo
 
 import cv2
 from dotenv import dotenv_values
@@ -69,6 +73,7 @@ class MyFlask(Flask):
 app = MyFlask(__name__)
 app.secret_key = APP_SECRET_KEY  # cambia in produzione
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["SIGHTING_TIMEZONE"] = config.get("sighting_timezone", "Europe/Rome")
 app.config["NOMINATIM_URL"] = config.get(
     "nominatim_url", "https://nominatim.openstreetmap.org/reverse"
 )
@@ -393,6 +398,49 @@ def export_fototrappole_csv():
     )
 
 
+def video_preview_url(filename, create=False):
+    """Return a browser preview URL, preserving uploaded AVI files unchanged."""
+    filename = Path(filename).name
+    if Path(filename).suffix.lower() != ".avi":
+        return url_for("uploaded_file", filename=filename)
+
+    source = Path(app.config["UPLOAD_FOLDER"]) / filename
+    preview = source.with_name(source.name + ".preview.mp4")
+    temporary = None
+    try:
+        if (
+            preview.is_file() and preview.stat().st_size > 0
+            and preview.stat().st_mtime >= source.stat().st_mtime
+        ):
+            return url_for("uploaded_file", filename=preview.name)
+        if not create:
+            return None
+        with NamedTemporaryFile(dir=source.parent, suffix=".mp4", delete=False) as output:
+            temporary = Path(output.name)
+        subprocess.run(
+            [
+                "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", str(source), "-map", "0:v:0", "-map", "0:a:0?",
+                "-vf", "scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:out_range=tv",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                "-pix_fmt", "yuv420p", "-color_range", "tv", "-threads", "2",
+                "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+                str(temporary),
+            ],
+            check=True, capture_output=True, timeout=15,
+        )
+        if temporary.stat().st_size == 0:
+            raise OSError("FFmpeg produced an empty preview")
+        temporary.replace(preview)
+        return url_for("uploaded_file", filename=preview.name)
+    except (OSError, subprocess.SubprocessError) as error:
+        app.logger.warning("Video preview unavailable for %s: %s", filename, error)
+        return None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def extract_frame(video_path, time_sec):
     cap = cv2.VideoCapture(video_path)
 
@@ -512,21 +560,47 @@ def save_sighting():
     original_file_name = request.form.get("original_file_name")
     new_file_name = request.form.get("new_file_name")
     file_content_md5 = request.form.get("file_content_md5")
-    date = request.form.get("date")
-    time_ = request.form.get("time_")
-    video_url = url_for("uploaded_file", filename=new_file_name)
+    date = request.form.get("date", "").strip()
+    time_ = request.form.get("time_", "").strip()
+    timestamp = None
+    invalid_timestamp = False
+    if date or time_:
+        try:
+            for format_ in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+                try:
+                    timestamp = datetime.strptime(f"{date} {time_}", format_)
+                    break
+                except ValueError:
+                    continue
+            else:
+                raise ValueError("Invalid sighting date or time")
+            timestamp = timestamp.replace(tzinfo=ZoneInfo(app.config["SIGHTING_TIMEZONE"]))
+            # Reject local times skipped by the daylight-saving clock change.
+            roundtrip = timestamp.astimezone(timezone.utc).astimezone(timestamp.tzinfo)
+            if roundtrip.replace(tzinfo=None) != timestamp.replace(tzinfo=None):
+                raise ValueError("Nonexistent local time")
+        except ValueError:
+            invalid_timestamp = True
+    video_url = video_preview_url(new_file_name)
 
     with engine.connect() as conn:
         # check if code already present in database
         query = text("SELECT COUNT(*) FROM sighting WHERE code = :code")
         n_code = conn.execute(query, {"code": code}).scalar()
-        if n_code:
-            flash(
-                Markup(
-                    f"Il codice dell'avistamento <b>{code}</b> è già presente nel database"
-                ),
-                "danger",
-            )
+        if n_code or invalid_timestamp:
+            if n_code:
+                flash(
+                    Markup(
+                        f"Il codice dell'avistamento <b>{code}</b> è già presente nel database"
+                    ),
+                    "danger",
+                )
+            if invalid_timestamp:
+                flash(
+                    "Data o ora non valide. Usa AAAA-MM-GG e HH:MM:SS (o HH:MM), "
+                    f"nel fuso orario {app.config['SIGHTING_TIMEZONE']}.",
+                    "danger",
+                )
 
             # list of fototrappole
             with engine.connect() as conn:
@@ -550,8 +624,12 @@ def save_sighting():
                     .fetchone()
                 )
                 fototrappola_details = (
-                    f"{fototrappola.tipo}<br>{fototrappola.nome} {fototrappola.cognome}<br>"
-                    f"{fototrappola.comune} {fototrappola.provincia} {fototrappola.regione}"
+                    (
+                        f"{fototrappola.tipo}<br>{fototrappola.nome} {fototrappola.cognome}<br>"
+                        f"{fototrappola.comune} {fototrappola.provincia} {fototrappola.regione}"
+                    )
+                    if fototrappola is not None
+                    else ""
                 )
 
             return render_template(
@@ -589,7 +667,7 @@ def save_sighting():
                 "code": code,
                 "operator": session["username"],
                 "institution": session["institution"],
-                "timestamp": None,
+                "timestamp": timestamp,
                 "camtrap_id": camtrap_id,
                 "scalp": scalp,
                 "transect_id": transect_id if transect_id else None,
@@ -803,7 +881,7 @@ def upload_video():
     save_path = Path(app.config["UPLOAD_FOLDER"]) / new_file_name
     video.save(save_path)
 
-    video_url = url_for("uploaded_file", filename=new_file_name)
+    video_url = video_preview_url(new_file_name, create=True)
     flash("Video caricato con successo!", "success")
 
     # check date time
