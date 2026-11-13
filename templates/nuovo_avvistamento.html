@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="it">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Nuovo avvistamento</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css" />
+    </head>
+    <body>
+        <main class="section">
+            <div class="container">
+                <div class="columns is-centered">
+                    <div class="column is-6-desktop">
+                        <h1 class="title has-text-centered">Nuovo avvistamento</h1>
+                        <p class="subtitle has-text-centered">Scegli il tipo di avvistamento</p>
+                        <div class="box">
+                            <h2 class="title is-5">Avvistamento da video</h2>
+                            <p class="mb-3">Carica un video registrato da una fototrappola.</p>
+                            <a class="button is-primary" href="{{ url_for('upload_video_form') }}">Continua</a>
+                        </div>
+                        <div class="box">
+                            <h2 class="title is-5">Avvistamento da foto</h2>
+                            <button class="button" type="button" disabled>In preparazione</button>
+                        </div>
+                        <div class="box">
+                            <h2 class="title is-5">Avvistamento da video di terzi</h2>
+                            <p class="mb-3">Video non registrato da una fototrappola.</p>
+                            <button class="button" type="button" disabled>In preparazione</button>
+                        </div>
+                        <a class="button" href="{{ url_for('index') }}">Home</a>
+                    </div>
+                </div>
+            </div>
+        </main>
+        {% include "footer.html" %}
+    </body>
+</html>
