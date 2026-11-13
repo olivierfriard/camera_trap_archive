@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="it">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Amministrazione utenti</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css" />
+    </head>
+    <body>
+        <main class="section">
+            <div class="container">
+                <h1 class="title">Amministrazione utenti</h1>
+                <a class="button mb-4" href="{{ url_for('index') }}">Home</a>
+                {% for category, message in get_flashed_messages(with_categories=true) %}
+                <div class="notification {{ 'is-success' if category == 'success' else 'is-danger' }}">{{ message }}</div>
+                {% endfor %}
+
+                {% macro input_field(name, label, value='', type='text', required=true, readonly=false) %}
+                <div class="column">
+                    <div class="field">
+                        <label class="label" for="{{ name }}">{{ label }}</label>
+                        <div class="control">
+                            <input class="input" id="{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ value }}" {% if required %}required{% endif %} {% if readonly %}readonly{% endif %} {% if type == 'password' %}autocomplete="new-password"{% endif %} />
+                        </div>
+                    </div>
+                </div>
+                {% endmacro %}
+
+                <div class="box">
+                    <h2 class="title is-4">{{ 'Modifica utente' if selected else 'Nuovo utente' }}</h2>
+                    <form method="post" action="{{ url_for('administration') }}">
+                        <input type="hidden" name="csrf_token" value="{{ session['admin_csrf_token'] }}" />
+                        <input type="hidden" name="action" value="{{ 'save' if selected else 'create' }}" />
+                        <div class="columns">
+                            {{ input_field('username', 'Nome utente', selected['username'] if selected else '', readonly=selected is not none) }}
+                            {{ input_field('fullname', 'Nome completo', selected['fullname'] if selected else '') }}
+                            {{ input_field('password', 'Nuova password (vuota per mantenere quella attuale)' if selected else 'Password', type='password', required=selected is none) }}
+                        </div>
+                        <div class="columns">
+                            {{ input_field('institution', 'Istituzione', selected['institution'] if selected else '') }}
+                            {{ input_field('code', 'Codice', selected['code'] if selected else '') }}
+                        </div>
+                        <div class="field is-grouped">
+                            <label class="checkbox mr-4"><input type="checkbox" name="is_active" value="1" {% if not selected or selected['is_active'] %}checked{% endif %} /> Attivo</label>
+                            <label class="checkbox"><input type="checkbox" name="is_admin" value="1" {% if selected and selected['is_admin'] %}checked{% endif %} /> Amministratore</label>
+                        </div>
+                        <div class="buttons">
+                            <button class="button is-primary" type="submit">{{ 'Salva modifiche' if selected else 'Crea utente' }}</button>
+                            {% if selected %}<a class="button" href="{{ url_for('administration') }}">Annulla</a>{% endif %}
+                        </div>
+                    </form>
+                </div>
+
+                <div class="table-container">
+                    <table class="table is-fullwidth is-striped">
+                        <thead><tr><th>Nome utente</th><th>Nome completo</th><th>Istituzione</th><th>Codice</th><th>Ruolo</th><th>Stato</th><th>Azioni</th></tr></thead>
+                        <tbody>
+                            {% for account in accounts %}
+                            <tr>
+                                <td>{{ account['username'] }}</td><td>{{ account['fullname'] }}</td><td>{{ account['institution'] }}</td><td>{{ account['code'] }}</td>
+                                <td>{{ 'Amministratore' if account['is_admin'] else 'Utente' }}</td>
+                                <td>{{ 'Attivo' if account['is_active'] else 'Disattivato' }}</td>
+                                <td>
+                                    <div class="buttons">
+                                        <a class="button is-small" href="{{ url_for('administration', username=account['username']) }}">Modifica</a>
+                                        <form method="post" action="{{ url_for('administration') }}">
+                                            <input type="hidden" name="csrf_token" value="{{ session['admin_csrf_token'] }}" />
+                                            <input type="hidden" name="username" value="{{ account['username'] }}" />
+                                            <input type="hidden" name="action" value="{{ 'deactivate' if account['is_active'] else 'reactivate' }}" />
+                                            <button class="button is-small {{ 'is-danger is-light' if account['is_active'] else 'is-success is-light' }}" type="submit">{{ 'Disattiva' if account['is_active'] else 'Riattiva' }}</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+        {% include "footer.html" %}
+    </body>
+</html>
