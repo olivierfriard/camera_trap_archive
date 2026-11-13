@@ -1,246 +1,522 @@
 <!doctype html>
 <html lang="it">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <title>Nuova fototrappola</title>
 
-        <!-- Bulma CSS -->
-        <link
-            rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css"
-        />
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Nuova fototrappola</title>
 
-        <!-- Leaflet CSS -->
-        <link
-            rel="stylesheet"
-            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-            crossorigin=""
-        />
+    <!-- Bulma CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css" />
 
-        <style>
-            #map {
-                height: 400px;
-                width: 100%;
-                border-radius: 8px;
-            }
-            video {
-                max-width: 100%;
-                margin-top: 1rem;
-                border-radius: 8px;
-            }
-        </style>
-    </head>
-    <body>
-        <section class="section">
-            <div class="container">
-                <h1 class="title is-3">Nuova fototrappola</h1>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                      {% if messages %}
-                        <div id="flashes">
-                          {% for category, msg in messages %}
-                            {# Map Flask categories to Bulma notification classes #}
-                            {% set bulma_class = {
-                              'success': 'is-success',
-                              'warning': 'is-warning',
-                              'info':    'is-info',
-                              'danger':  'is-danger',
-                              'error':   'is-danger'
-                            }[category] if category in ['success','warning','info','danger','error'] else 'is-light' %}
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 8px;
+        }
 
-                            <div class="notification {{ bulma_class }}">
-                              <button class="delete" aria-label="dismiss"></button>
-                              {{ msg }}
+        video {
+            max-width: 100%;
+            margin-top: 1rem;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <section class="section">
+        <div class="container">
+            <h1 class="title is-3">Nuova fototrappola</h1>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div id="flashes">
+                {% for category, msg in messages %}
+                {# Map Flask categories to Bulma notification classes #}
+                {% set bulma_class = {
+                'success': 'is-success',
+                'warning': 'is-warning',
+                'info': 'is-info',
+                'danger': 'is-danger',
+                'error': 'is-danger'
+                }[category] if category in ['success','warning','info','danger','error'] else 'is-light' %}
+
+                <div class="notification {{ bulma_class }}">
+                    <button class="delete" aria-label="dismiss"></button>
+                    {{ msg }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            <form method="post" action="{{ url_for('save_fototrappola') }}">
+
+                <div class="columns is-multiline">
+                    <div class="column is-one-third">
+                        <div class="field">
+                            <label class="label">Codice</label>
+                            <div class="control">
+                                <input class="input" name="codice" required />
                             </div>
-                          {% endfor %}
                         </div>
-                      {% endif %}
-                    {% endwith %}
+                    </div>
 
-<form method="post" action="{{ url_for('save_fototrappola') }}">
+                    <div class="column is-one-third">
+                        <div class="field">
+                            <label class="label">Tipo</label>
+                            <div class="control">
+                                <input class="input" name="tipo" required />
+                            </div>
+                        </div>
+                    </div>
 
-    <div class="columns is-multiline">
-        <div class="column is-one-third">
-            <div class="field">
-                <label class="label">Codice</label>
-                <div class="control">
-                    <input class="input" name="codice" required />
+                    <div class="column is-one-third">
+                        <div class="field">
+                            <label class="label">Intersezioni</label>
+                            <div class="control">
+                                <input class="input" name="intersezioni" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
 
-        <div class="column is-one-third">
-            <div class="field">
-                <label class="label">Tipo</label>
-                <div class="control">
-                    <input class="input" name="tipo" required />
+                <div class="columns is-multiline">
+                    <div class="column is-one-quarter">
+                        <div class="field">
+                            <label class="label">Data Inizio</label>
+                            <div class="control">
+                                <input class="input" type="date" name="data_inizio" required />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-quarter">
+                        <div class="field">
+                            <label class="label">Data Fine</label>
+                            <div class="control">
+                                <input class="input" type="date" name="data_fine" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-quarter">
+                        <div class="field">
+                            <label class="label">Nome</label>
+                            <div class="control">
+                                <input class="input" name="nome" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-quarter">
+                        <div class="field">
+                            <label class="label">Cognome</label>
+                            <div class="control">
+                                <input class="input" name="cognome" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
 
-        <div class="column is-one-third">
-            <div class="field">
-                <label class="label">Intersezioni</label>
-                <div class="control">
-                    <input class="input" name="intersezioni" />
+                <div class="columns is-multiline">
+
+                    <div class="column is-one-quarter">
+                        <div class="field">
+                            <label class="label" for="location">Località</label>
+                            <div class="control">
+                                <input class="input" id="location" name="location" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-quarter">
+                        <div class="field">
+                            <label class="label">Comune</label>
+                            <div class="control">
+                                <input class="input" name="comune" required />
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="column is-one-quarter">
+                        <div class="field">
+                            <label class="label">Provincia</label>
+                            <div class="control">
+                                <input class="input" name="provincia" required />
+                            </div>
+                        </div>
+                    </div>
+
+
+
+
+                    <div class="column is-one-quarter">
+                        <div class="field">
+                            <label class="label">Regione</label>
+                            <div class="control">
+                                <input class="input" name="regione" required />
+                            </div>
+                        </div>
+                    </div>
+
+
                 </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="columns is-multiline">
-        <div class="column is-one-quarter">
-            <div class="field">
-                <label class="label">Data Inizio</label>
-                <div class="control">
-                    <input class="input" type="date" name="data_inizio" required />
+                <div class="field">
+                    <label class="label">Paese (default: Italia)</label>
+                    <div class="control">
+                        <input class="input" name="country" value="Italia" />
+                    </div>
                 </div>
-            </div>
-        </div>
 
-        <div class="column is-one-quarter">
-            <div class="field">
-                <label class="label">Data Fine</label>
-                <div class="control">
-                    <input class="input" type="date" name="data_fine" />
+
+                <div class="columns is-multiline">
+                    <div class="column is-one-third">
+                        <div class="field">
+                            <label class="label">Latitudine</label>
+                            <div class="control">
+                                <input class="input" id="latInput" name="latitudine" required />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-third">
+                        <div class="field">
+                            <label class="label">Longitudine</label>
+                            <div class="control">
+                                <input class="input" id="lngInput" name="longitudine" required />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-one-third">
+                        <div class="field">
+                            <label class="label">Altitudine</label>
+                            <div class="control">
+                                <input class="input" id="altInput" type="number" step="1" name="altitudine"
+                                    aria-describedby="altitudeStatus altitudeSource" />
+                            </div>
+                            <p class="help" id="altitudeStatus" role="status" aria-live="polite"></p>
+                            <p class="help" id="altitudeSource">Stima in metri da <a
+                                    href="https://open-meteo.com/en/docs/elevation-api" target="_blank"
+                                    rel="noopener noreferrer">Open-Meteo</a> / <a
+                                    href="https://doi.org/10.5270/ESA-c5d3d65" target="_blank"
+                                    rel="noopener noreferrer">Copernicus DEM</a>. Modificabile manualmente.</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
 
-        <div class="column is-one-quarter">
-            <div class="field">
-                <label class="label">Nome</label>
-                <div class="control">
-                    <input class="input" name="nome" />
+                <div class="columns is-multiline">
+                    <div class="column is-one-third">
+                        <div class="field">
+                            <label class="label" for="utmZoneInput">Zona UTM (numero e lettera)</label>
+                            <div class="control">
+                                <input class="input" id="utmZoneInput" name="utm_zone" placeholder="32T" maxlength="3" aria-describedby="coordinateStatus utmHelp" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="column is-one-third">
+                        <div class="field">
+                            <label class="label" for="utmEastInput">Est UTM (m)</label>
+                            <div class="control">
+                                <input class="input" id="utmEastInput" name="utm_easting" type="number" step="any" aria-describedby="coordinateStatus utmHelp" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="column is-one-third">
+                        <div class="field">
+                            <label class="label" for="utmNorthInput">Nord UTM (m)</label>
+                            <div class="control">
+                                <input class="input" id="utmNorthInput" name="utm_northing" type="number" step="any" aria-describedby="coordinateStatus utmHelp" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
+                <p class="help" id="utmHelp">Coordinate WGS84. La lettera indica la banda di latitudine (es. 32T), non l'emisfero. UTM disponibile da 80° S a 84° N.</p>
+                <p class="help" id="coordinateStatus" role="status" aria-live="polite"></p>
 
-        <div class="column is-one-quarter">
-            <div class="field">
-                <label class="label">Cognome</label>
-                <div class="control">
-                    <input class="input" name="cognome" />
+                <p class="help" id="addressStatus" role="status" aria-live="polite"></p>
+                <p class="help">Comune, provincia, regione e paese da <a href="https://www.openstreetmap.org/copyright"
+                        target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a>. Verifica i risultati
+                    e correggili se necessario.</p>
+                <p class="help">Clicca sulla mappa per impostare le coordinate.</p>
+                <div id="map" style="height: 400px; border-radius: 8px;"></div>
+
+                <br />
+
+
+                <div class="field is-grouped">
+                    <div class="control">
+                        <button class="button is-primary" type="submit">Salva</button>
+                    </div>
                 </div>
-            </div>
+
+            </form>
         </div>
-    </div>
+    </section>
+</body>
 
-    <div class="columns is-multiline">
-        <div class="column is-one-third">
-            <div class="field">
-                <label class="label">Regione</label>
-                <div class="control">
-                    <input class="input" name="regione" required />
-                </div>
-            </div>
-        </div>
-
-        <div class="column is-one-third">
-            <div class="field">
-                <label class="label">Provincia</label>
-                <div class="control">
-                    <input class="input" name="provincia" required />
-                </div>
-            </div>
-        </div>
-
-        <div class="column is-one-third">
-            <div class="field">
-                <label class="label">Comune</label>
-                <div class="control">
-                    <input class="input" name="comune" required />
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="columns is-multiline">
-        <div class="column is-one-third">
-            <div class="field">
-                <label class="label">Latitudine</label>
-                <div class="control">
-                    <input class="input" id="latInput" name="latitudine"  required />
-                </div>
-            </div>
-        </div>
-
-        <div class="column is-one-third">
-            <div class="field">
-                <label class="label">Longitudine</label>
-                <div class="control">
-                    <input class="input" id="lngInput" name="longitudine"  required />
-                </div>
-            </div>
-        </div>
-
-        <div class="column is-one-third">
-            <div class="field">
-                <label class="label">Altitudine</label>
-                <div class="control">
-                    <input class="input" type="number" step="1" name="altitudine" />
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <p class="help">Clicca sulla mappa per impostare le coordinate.</p>
-    <div id="map" style="height: 400px; border-radius: 8px;"></div>
-
-    <br />
-
-    <div class="field">
-        <label class="label">Paese (default: Italia)</label>
-        <div class="control">
-            <input class="input" name="country" value="Italia" />
-        </div>
-    </div>
-
-    <div class="field is-grouped">
-        <div class="control">
-            <button class="button is-primary" type="submit">Salva</button>
-        </div>
-    </div>
-
-</form>
-            </div>
-        </section>
-    </body>
-
-<script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    crossorigin=""
-></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/proj4@2.22.0/dist/proj4.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/utm-coordinates.js') }}"></script>
 <script>
-const map = L.map("map").setView([45.0, 7.6], 12);
+    const map = L.map("map").setView([45.0, 7.6], 12);
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "© OpenStreetMap",
-}).addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap",
+    }).addTo(map);
 
-let marker = null;
+    let marker = null;
+    const latInput = document.getElementById("latInput");
+    const lngInput = document.getElementById("lngInput");
+    const altInput = document.getElementById("altInput");
+    const altitudeStatus = document.getElementById("altitudeStatus");
+    const utmZoneInput = document.getElementById("utmZoneInput");
+    const utmEastInput = document.getElementById("utmEastInput");
+    const utmNorthInput = document.getElementById("utmNorthInput");
+    const coordinateStatus = document.getElementById("coordinateStatus");
+    const utmFields = [utmZoneInput, utmEastInput, utmNorthInput];
+    const utmAvailable = typeof proj4 === "function" && typeof CameraTrapUtm !== "undefined";
+    if (!utmAvailable) utmFields.forEach(field => { field.disabled = true; });
+    let elevationTimer = null;
+    let elevationController = null;
+    let elevationVersion = 0;
+    let automaticAltitude = null;
+    const reverseGeocodeUrl = {{url_for('reverse_geocode') | tojson }};
+    const addressStatus = document.getElementById("addressStatus");
+    const addressFields = Object.fromEntries(
+        ["comune", "provincia", "regione", "country"].map(name => [name, document.querySelector(`input[name="${name}"]`)])
+    );
+    const manualAddressFields = new Set();
+    const automaticAddress = new Map();
+    let addressTimer = null;
+    let addressController = null;
+    let addressVersion = 0;
 
-function setCoords(lat, lng) {
-    document.getElementById("latInput").value = lat.toFixed(6);
-    document.getElementById("lngInput").value = lng.toFixed(6);
-}
-
-map.on("click", (e) => {
-    const { lat, lng } = e.latlng;
-
-    if (!marker) {
-        marker = L.marker([lat, lng], { draggable: true }).addTo(map);
-        marker.on("dragend", (ev) => {
-            const pos = ev.target.getLatLng();
-            setCoords(pos.lat, pos.lng);
+    for (const [name, field] of Object.entries(addressFields)) {
+        field.addEventListener("input", () => {
+            if (field.value.trim()) manualAddressFields.add(name);
+            else manualAddressFields.delete(name);
+            automaticAddress.delete(name);
         });
-    } else {
-        marker.setLatLng([lat, lng]);
     }
 
-    setCoords(lat, lng);
-});
+    function scheduleAddress() {
+        clearTimeout(addressTimer);
+        addressVersion += 1;
+        if (addressController) addressController.abort();
+        for (const [name, value] of automaticAddress) {
+            if (addressFields[name].value === value && !manualAddressFields.has(name)) {
+                addressFields[name].value = "";
+            }
+        }
+        automaticAddress.clear();
+        addressStatus.textContent = "";
+        if (!latInput.value.trim() || !lngInput.value.trim()) return;
+        const lat = Number(latInput.value);
+        const lng = Number(lngInput.value);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
+        const version = addressVersion;
+        addressTimer = setTimeout(() => fetchAddress(lat, lng, version), 900);
+    }
+
+    async function fetchAddress(lat, lng, version, retried = false) {
+        const controller = new AbortController();
+        addressController = controller;
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        addressStatus.textContent = "Ricerca di comune, provincia, regione e paese…";
+        try {
+            const params = new URLSearchParams({latitude: lat, longitude: lng});
+            const response = await fetch(`${reverseGeocodeUrl}?${params}`, {signal: controller.signal});
+            if (version !== addressVersion) return;
+            if (response.status === 429 && !retried) {
+                const seconds = Number(response.headers.get("Retry-After")) || 2;
+                addressStatus.textContent = "Servizio occupato. Nuovo tentativo in attesa…";
+                addressTimer = setTimeout(() => fetchAddress(lat, lng, version, true), Math.min(60, Math.max(1, seconds)) * 1000);
+                return;
+            }
+            if (!response.ok) throw new Error("Reverse geocoding failed");
+            const data = await response.json();
+            if (version !== addressVersion) return;
+            let missing = false;
+            for (const [name, field] of Object.entries(addressFields)) {
+                if (manualAddressFields.has(name)) continue;
+                if (typeof data[name] === "string" && data[name].trim()) {
+                    field.value = data[name];
+                    automaticAddress.set(name, data[name]);
+                } else missing = true;
+            }
+            addressStatus.textContent = missing
+                ? "Dati parziali: completa i campi mancanti e verifica i risultati."
+                : "Dati geografici trovati. Verifica i risultati; i campi modificati manualmente sono stati conservati.";
+        } catch (error) {
+            if (version !== addressVersion) return;
+            addressStatus.textContent = "Dati geografici non disponibili. Compila i campi manualmente.";
+        } finally {
+            clearTimeout(timeout);
+            if (addressController === controller) addressController = null;
+        }
+    }
+
+    function cancelElevation() {
+        clearTimeout(elevationTimer);
+        elevationVersion += 1;
+        if (elevationController) {
+            elevationController.abort();
+            elevationController = null;
+        }
+    }
+
+    function scheduleElevation() {
+        cancelElevation();
+        if (automaticAltitude !== null && altInput.value === automaticAltitude) {
+            altInput.value = "";
+        }
+        automaticAltitude = null;
+        altitudeStatus.textContent = "";
+        if (!latInput.value.trim() || !lngInput.value.trim()) return;
+        const lat = Number(latInput.value);
+        const lng = Number(lngInput.value);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+            altitudeStatus.textContent = "Inserisci coordinate valide per stimare l'altitudine.";
+            return;
+        }
+        const version = elevationVersion;
+        elevationTimer = setTimeout(() => fetchElevation(lat, lng, version), 400);
+    }
+
+    async function fetchElevation(lat, lng, version) {
+        const controller = new AbortController();
+        elevationController = controller;
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        altitudeStatus.textContent = "Ricerca dell'altitudine…";
+        try {
+            const params = new URLSearchParams({latitude: lat, longitude: lng});
+            const response = await fetch(`https://api.open-meteo.com/v1/elevation?${params}`, {
+                signal: controller.signal,
+            });
+            if (!response.ok) throw new Error("Elevation request failed");
+            const data = await response.json();
+            const elevation = Array.isArray(data.elevation) ? data.elevation[0] : null;
+            if (!Number.isFinite(elevation)) throw new Error("Invalid elevation response");
+            // Ignore stale responses and preserve manual edits made during the request.
+            if (version !== elevationVersion) return;
+            automaticAltitude = String(Math.round(elevation));
+            altInput.value = automaticAltitude;
+            altitudeStatus.textContent = "Altitudine stimata. Puoi correggerla manualmente.";
+        } catch (error) {
+            if (version !== elevationVersion) return;
+            altitudeStatus.textContent = "Altitudine non disponibile. Inseriscila manualmente.";
+        } finally {
+            clearTimeout(timeout);
+            if (elevationController === controller) elevationController = null;
+        }
+    }
+
+    altInput.addEventListener("input", () => {
+        cancelElevation();
+        automaticAltitude = null;
+        altitudeStatus.textContent = altInput.value ? "Altitudine inserita manualmente." : "";
+    });
+
+    function clearMarker() {
+        if (marker) marker.remove();
+        marker = null;
+    }
+
+    function updateMarker(lat, lng) {
+        if (!marker) {
+            marker = L.marker([lat, lng], {draggable: true}).addTo(map);
+            marker.on("dragend", (ev) => {
+                const pos = ev.target.getLatLng();
+                setCoords(pos.lat, pos.lng);
+            });
+        } else {
+            marker.setLatLng([lat, lng]);
+        }
+        map.panTo([lat, lng]);
+    }
+
+    function syncFromGeographic() {
+        utmFields.forEach(field => { field.setCustomValidity(""); field.value = ""; });
+        latInput.setCustomValidity("");
+        lngInput.setCustomValidity("");
+        coordinateStatus.textContent = utmAvailable ? "" : "Conversione UTM non disponibile. Usa latitudine e longitudine.";
+        const lat = Number(latInput.value);
+        const lng = Number(lngInput.value);
+        if (!latInput.value.trim() || !lngInput.value.trim()) {
+            clearMarker();
+        } else if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+            const message = "Inserisci latitudine tra -90 e 90 e longitudine tra -180 e 180.";
+            latInput.setCustomValidity(message);
+            coordinateStatus.textContent = message;
+            clearMarker();
+        } else {
+            updateMarker(lat, lng);
+            if (utmAvailable) {
+                try {
+                    const utm = CameraTrapUtm.fromLatLon(lat, lng);
+                    utmZoneInput.value = utm.zone;
+                    utmEastInput.value = utm.easting.toFixed(0);
+                    utmNorthInput.value = utm.northing.toFixed(0);
+                } catch (error) {
+                    coordinateStatus.textContent = "Conversione UTM non disponibile per queste coordinate (limiti: 80° S – 84° N).";
+                }
+            }
+        }
+        scheduleElevation();
+        scheduleAddress();
+    }
+
+    function syncFromUtm() {
+        utmFields.forEach(field => field.setCustomValidity(""));
+        latInput.setCustomValidity("");
+        lngInput.setCustomValidity("");
+        // Clear the stored coordinate fields until the UTM input is valid and complete.
+        latInput.value = "";
+        lngInput.value = "";
+        let message = "";
+        if (utmFields.some(field => !field.value.trim())) {
+            if (utmFields.some(field => field.value.trim())) message = "Completa zona, Est e Nord UTM.";
+            clearMarker();
+        } else {
+            try {
+                const coordinates = CameraTrapUtm.toLatLon(
+                    utmZoneInput.value, Number(utmEastInput.value), Number(utmNorthInput.value)
+                );
+                latInput.value = coordinates.latitude.toFixed(8);
+                lngInput.value = coordinates.longitude.toFixed(8);
+                utmZoneInput.value = coordinates.zone;
+                updateMarker(coordinates.latitude, coordinates.longitude);
+            } catch (error) {
+                message = "Coordinate UTM non valide: verifica zona (1–60), banda (C–X, senza I e O), Est e Nord.";
+                clearMarker();
+            }
+        }
+        utmZoneInput.setCustomValidity(message);
+        coordinateStatus.textContent = message;
+        scheduleElevation();
+        scheduleAddress();
+    }
+
+    function setCoords(lat, lng) {
+        latInput.value = lat.toFixed(6);
+        lngInput.value = lng.toFixed(6);
+        syncFromGeographic();
+    }
+
+    latInput.addEventListener("input", syncFromGeographic);
+    lngInput.addEventListener("input", syncFromGeographic);
+    utmFields.forEach(field => field.addEventListener("input", syncFromUtm));
+    map.on("click", e => setCoords(e.latlng.lat, e.latlng.lng));
+    syncFromGeographic();
 </script>
+
 </html>

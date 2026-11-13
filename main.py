@@ -3,13 +3,16 @@ camera trap archive service
 """
 
 import base64
+import csv
 import hashlib
 import logging
+import math
 import os
 import secrets
 import sys
 import time
 from argparse import Namespace
+from io import StringIO
 from logging.handlers import WatchedFileHandler
 from pathlib import Path
 
@@ -17,9 +20,11 @@ import cv2
 from dotenv import dotenv_values
 from flask import (
     Flask,
+    Response,
     abort,
     flash,
     g,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -34,6 +39,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import camtrap_banner_decoder
+from geocoding import GeocodingError
+from geocoding import reverse_geocode as lookup_address
 
 config_filename = Path(__file__).with_name(".env")
 
@@ -62,6 +69,13 @@ class MyFlask(Flask):
 app = MyFlask(__name__)
 app.secret_key = APP_SECRET_KEY  # cambia in produzione
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["NOMINATIM_URL"] = config.get(
+    "nominatim_url", "https://nominatim.openstreetmap.org/reverse"
+)
+app.config["NOMINATIM_USER_AGENT"] = config.get(
+    "nominatim_user_agent", "camera_trap_archive/0.1"
+)
+app.config["GEOCODING_CACHE_PATH"] = Path(app.instance_path) / "geocoding.sqlite3"
 
 
 # Logger applicatif
@@ -82,16 +96,21 @@ if not os.path.exists(UPLOAD_FOLDER):
 # PostgreSQL connection
 engine = create_engine(DATABASE_URL)
 
+
 def get_user(username):
     """Fetch an account and its access status from PostgreSQL."""
     with engine.connect() as conn:
-        return conn.execute(
-            text(
-                "SELECT username, password_hash, fullname, institution, code, is_active, is_admin "
-                "FROM public.users WHERE username = :username"
-            ),
-            {"username": username},
-        ).mappings().fetchone()
+        return (
+            conn.execute(
+                text(
+                    "SELECT username, password_hash, fullname, institution, code, is_active, is_admin "
+                    "FROM public.users WHERE username = :username"
+                ),
+                {"username": username},
+            )
+            .mappings()
+            .fetchone()
+        )
 
 
 # --- Login required decorator ---
@@ -131,7 +150,8 @@ def administration():
 
     if request.method == "POST":
         if not secrets.compare_digest(
-            session["admin_csrf_token"].encode(), request.form.get("csrf_token", "").encode()
+            session["admin_csrf_token"].encode(),
+            request.form.get("csrf_token", "").encode(),
         ):
             abort(400)
         action = request.form.get("action")
@@ -155,37 +175,61 @@ def administration():
         try:
             with engine.begin() as conn:
                 # Serialize account changes to protect the last active administrator.
-                conn.execute(text("LOCK TABLE public.users IN SHARE ROW EXCLUSIVE MODE"))
-                actor = conn.execute(
-                    text("SELECT is_active, is_admin FROM public.users WHERE username = :username"),
-                    {"username": session["username"]},
-                ).mappings().fetchone()
+                conn.execute(
+                    text("LOCK TABLE public.users IN SHARE ROW EXCLUSIVE MODE")
+                )
+                actor = (
+                    conn.execute(
+                        text(
+                            "SELECT is_active, is_admin FROM public.users WHERE username = :username"
+                        ),
+                        {"username": session["username"]},
+                    )
+                    .mappings()
+                    .fetchone()
+                )
                 if actor is None or not actor["is_active"] or not actor["is_admin"]:
                     abort(403)
                 if action == "create":
-                    conn.execute(text(
-                        "INSERT INTO public.users "
-                        "(username, password_hash, fullname, institution, code, is_active, is_admin) "
-                        "VALUES (:username, :password_hash, :fullname, :institution, :code, :is_active, :is_admin)"
-                    ), values)
+                    conn.execute(
+                        text(
+                            "INSERT INTO public.users "
+                            "(username, password_hash, fullname, institution, code, is_active, is_admin) "
+                            "VALUES (:username, :password_hash, :fullname, :institution, :code, :is_active, :is_admin)"
+                        ),
+                        values,
+                    )
                 else:
-                    target = conn.execute(
-                        text("SELECT is_active, is_admin FROM public.users WHERE username = :username"),
-                        {"username": username},
-                    ).mappings().fetchone()
+                    target = (
+                        conn.execute(
+                            text(
+                                "SELECT is_active, is_admin FROM public.users WHERE username = :username"
+                            ),
+                            {"username": username},
+                        )
+                        .mappings()
+                        .fetchone()
+                    )
                     if target is None:
                         abort(404)
                     if action in ("deactivate", "reactivate"):
                         values["is_active"] = action == "reactivate"
                         values["is_admin"] = target["is_admin"]
-                    if target["is_admin"] and target["is_active"] and not (
-                        values["is_admin"] and values["is_active"]
+                    if (
+                        target["is_admin"]
+                        and target["is_active"]
+                        and not (values["is_admin"] and values["is_active"])
                     ):
-                        count = conn.execute(text(
-                            "SELECT count(*) FROM public.users WHERE is_active AND is_admin"
-                        )).scalar_one()
+                        count = conn.execute(
+                            text(
+                                "SELECT count(*) FROM public.users WHERE is_active AND is_admin"
+                            )
+                        ).scalar_one()
                         if count <= 1:
-                            flash("Non puoi disattivare o rimuovere il ruolo dell'ultimo amministratore attivo.", "danger")
+                            flash(
+                                "Non puoi disattivare o rimuovere il ruolo dell'ultimo amministratore attivo.",
+                                "danger",
+                            )
                             return redirect(url_for("administration"))
                     if action == "save":
                         sql = (
@@ -199,21 +243,42 @@ def administration():
                         sql = "UPDATE public.users SET is_active = :is_active WHERE username = :username"
                     conn.execute(text(sql), values)
         except IntegrityError:
-            flash("Nome utente già esistente. Scegli un altro nome o riattiva il conto esistente.", "danger")
+            flash(
+                "Nome utente già esistente. Scegli un altro nome o riattiva il conto esistente.",
+                "danger",
+            )
         else:
-            flash("Utente creato." if action == "create" else "Utente aggiornato.", "success")
+            flash(
+                "Utente creato." if action == "create" else "Utente aggiornato.",
+                "success",
+            )
         return redirect(url_for("administration"))
 
     with engine.connect() as conn:
-        accounts = conn.execute(text(
-            "SELECT username, fullname, institution, code, is_active, is_admin "
-            "FROM public.users ORDER BY username"
-        )).mappings().all()
+        accounts = (
+            conn.execute(
+                text(
+                    "SELECT username, fullname, institution, code, is_active, is_admin "
+                    "FROM public.users ORDER BY username"
+                )
+            )
+            .mappings()
+            .all()
+        )
     selected_username = request.args.get("username")
-    selected = next((user for user in accounts if user["username"] == selected_username), None)
+    selected = next(
+        (user for user in accounts if user["username"] == selected_username), None
+    )
     if selected_username is not None and selected is None:
         abort(404)
     return render_template("administration.html", accounts=accounts, selected=selected)
+
+
+@app.route(APP_ROOT + "/nuovo_avvistamento", methods=["GET"])
+@login_required
+def nuovo_avvistamento():
+    """Let the current user choose the source of a new sighting."""
+    return render_template("nuovo_avvistamento.html")
 
 
 @app.route(APP_ROOT + "/upload_video_form")
@@ -266,6 +331,66 @@ def elenco_fototrappole():
             conn.execute(sql, {"operator": session["username"]}).mappings().all()
         )
     return render_template("elenco_fototrappole.html", fototrappole=fototrappole)
+
+
+@app.route(APP_ROOT + "/elenco_fototrappole/export.csv", methods=["GET"])
+@login_required
+def export_fototrappole_csv():
+    """Export the current user's camera traps as an Excel-compatible CSV."""
+    with engine.connect() as conn:
+        fototrappole = (
+            conn.execute(
+                text("SELECT * FROM fototrappole WHERE operator = :operator"),
+                {"operator": session["username"]},
+            )
+            .mappings()
+            .all()
+        )
+
+    def csv_text(value):
+        """Keep text cells from being interpreted as spreadsheet formulas."""
+        value = "" if value is None else str(value)
+        if value.startswith(("\t", "\r", "\n")) or value.lstrip().startswith(
+            ("=", "+", "-", "@")
+        ):
+            return "'" + value
+        return value
+
+    output = StringIO(newline="")
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(
+        [
+            "Codice",
+            "Tipo",
+            "Nome",
+            "Data installazione",
+            "Data fine",
+            "Intersezione",
+            "Latitudine",
+            "Longitudine",
+        ]
+    )
+    for foto in fototrappole:
+        writer.writerow(
+            [
+                csv_text(foto["codice"]),
+                csv_text(foto["tipo"]),
+                csv_text(f"{foto['nome'] or ''} {foto['cognome'] or ''}".strip()),
+                foto["data_inizio"],
+                foto["data_fine"],
+                csv_text(foto.get("intersezioni", foto.get("intersezione"))),
+                foto["latitudine"],
+                foto["longitudine"],
+            ]
+        )
+    return Response(
+        output.getvalue().encode("utf-8-sig"),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="fototrappole.csv"',
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 def extract_frame(video_path, time_sec):
@@ -325,10 +450,43 @@ def get_fototrappola_data():
 @login_required
 def nuova_fototrappola():
     """
-    save nuova fototrappola
+    nuova fototrappola
     """
     if request.method == "GET":
         return render_template("nuova_fototrappola.html")
+
+
+@app.route(APP_ROOT + "/reverse_geocode", methods=["GET"])
+@login_required
+def reverse_geocode():
+    """Return administrative names for a camera trap's coordinates."""
+    try:
+        latitude = float(request.args.get("latitude", ""))
+        longitude = float(request.args.get("longitude", ""))
+        if not (
+            math.isfinite(latitude)
+            and math.isfinite(longitude)
+            and -90 <= latitude <= 90
+            and -180 <= longitude <= 180
+        ):
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify(error="Coordinate non valide."), 400
+    try:
+        address = lookup_address(
+            latitude,
+            longitude,
+            cache_path=app.config["GEOCODING_CACHE_PATH"],
+            service_url=app.config["NOMINATIM_URL"],
+            user_agent=app.config["NOMINATIM_USER_AGENT"],
+        )
+    except GeocodingError as error:
+        response = jsonify(error=str(error))
+        response.status_code = error.status
+        if error.retry_after:
+            response.headers["Retry-After"] = str(error.retry_after)
+        return response
+    return jsonify(address)
 
 
 @app.route(APP_ROOT + "/save_info", methods=["POST"])
@@ -490,6 +648,7 @@ def save_fototrappola():
             regione = request.form.get("regione")
             provincia = request.form.get("provincia")
             comune = request.form.get("comune")
+            location = request.form.get("location", "").strip() or None
             country = request.form.get("country", "Italia")
             latitudine = request.form.get("latitudine")
             longitudine = request.form.get("longitudine")
@@ -505,18 +664,32 @@ def save_fototrappola():
             query = text("""
                 INSERT INTO fototrappole (
                     codice, tipo, data_inizio, data_fine, nome, cognome,
-                    regione, provincia, comune, country,
+                    regione, provincia, comune, location, country,
                     latitudine, longitudine, altitudine, intersezioni, operator
                 )
                 VALUES (
                     :codice, :tipo, :data_inizio, :data_fine, :nome, :cognome,
-                    :regione, :provincia, :comune, :country,
+                    :regione, :provincia, :comune, :location, :country,
                     :latitudine, :longitudine, :altitudine, :intersezioni, :operator
                 )
             """)
 
             # Esecuzione query
             with engine.connect() as conn:
+                # Check the code within the current operator's camera traps.
+                duplicate = conn.execute(
+                    text(
+                        "SELECT EXISTS (SELECT 1 FROM fototrappole "
+                        "WHERE codice = :codice AND operator = :operator)"
+                    ),
+                    {"codice": codice, "operator": session["username"]},
+                ).scalar()
+                if duplicate:
+                    flash(
+                        "Esiste già una fototrappola con questo codice per il tuo utente.",
+                        "error",
+                    )
+                    return redirect(url_for("nuova_fototrappola"))
                 conn.execute(
                     query,
                     {
@@ -529,6 +702,7 @@ def save_fototrappola():
                         "regione": regione,
                         "provincia": provincia,
                         "comune": comune,
+                        "location": location,
                         "country": country,
                         "latitudine": float(latitudine),
                         "longitudine": float(longitudine),

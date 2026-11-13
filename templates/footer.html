@@ -14,6 +14,9 @@
                   <div class="content has-text-centered">
                     <p>
                       &copy; {{ current_year }} Università di Torino
+                      {% if session.get('username') and session.get('fullname') %}
+                      — Utente: {{ session['fullname'] }}
+                      {% endif %}
                     </p>
                   </div>
                 </footer>

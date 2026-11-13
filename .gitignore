@@ -3,3 +3,4 @@ uploads
 __pycache__
 users.py
 .env
+instance/geocoding.sqlite3*
