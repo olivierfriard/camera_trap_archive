@@ -284,7 +284,7 @@ def nuovo_avvistamento():
 @app.route(APP_ROOT + "/upload_video_form")
 @login_required
 def upload_video_form():
-    return render_template("upload_video.html")
+    return render_template("upload_camtrap_video.html")
 
 
 @app.route(APP_ROOT + "/login", methods=["GET", "POST"])
@@ -412,15 +412,16 @@ def extract_frame(video_path, time_sec):
         resized = cv2.resize(frame, (new_width, new_height))
 
         ok, jpg = cv2.imencode(".jpg", resized)
+        cap.release()
         if not ok:
-            cap.release()
+            app.logger.error("Failed to extract frame from {video_path}")
             return None
 
         return jpg.tobytes()
-    else:
-        print("Failed to extract frame")
 
+    app.logger.error("Failed to extract frame from {video_path}")
     cap.release()
+    return None
 
 
 @app.route("/get_fototrappola_data", methods=["GET"])
@@ -491,9 +492,9 @@ def reverse_geocode():
 
 @app.route(APP_ROOT + "/save_info", methods=["POST"])
 @login_required
-def save_info():
+def save_sighting():
     """
-    save info into db
+    save sighting into db
     """
 
     # operator = request.form.get("operator")
@@ -554,7 +555,7 @@ def save_info():
                 )
 
             return render_template(
-                "upload_info.html",
+                "upload_camtrap_sighting.html",
                 original_file_name=original_file_name,
                 new_file_name=str(new_file_name),
                 video_url=video_url,
@@ -759,6 +760,8 @@ def upload_video():
         flash("Nessun file video caricato!", "danger")
         return redirect(url_for("index"))
 
+    app.logger.info(f"new video {video.filename} uploaded by {session['fullname']}")
+
     # compute MD5 incrementally
     md5 = hashlib.md5()
     chunk_size = 8192  # 8 KB
@@ -800,10 +803,6 @@ def upload_video():
     save_path = Path(app.config["UPLOAD_FOLDER"]) / new_file_name
     video.save(save_path)
 
-    # md5 of file content
-    # file_content_md5 = hashlib.md5(open(save_path, "rb").read()).hexdigest()
-    # print(file_content_md5)
-
     video_url = url_for("uploaded_file", filename=new_file_name)
     flash("Video caricato con successo!", "success")
 
@@ -828,8 +827,6 @@ def upload_video():
     except Exception:
         time_ = data["time"]
 
-    print(session["fullname"])
-
     # list of fototrappole
     with engine.connect() as conn:
         fototrappole = (
@@ -842,7 +839,7 @@ def upload_video():
         )
 
     return render_template(
-        "upload_info.html",
+        "upload_camtrap_sighting.html",
         original_file_name=original_file_name,
         new_file_name=str(new_file_name),
         video_url=video_url,
