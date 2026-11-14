@@ -36,6 +36,7 @@ class SightingDateTimeTests(unittest.TestCase):
             patch.object(self.main, "engine", engine),
             patch.object(self.main, "get_user", return_value=account),
             patch.object(self.main, "extract_frame", return_value=b"frame"),
+            patch.object(self.main, "start_conversion_worker"),
             patch.dict(self.main.app.config, TESTING=True, SIGHTING_TIMEZONE="Europe/Rome"),
         ):
             patcher.start()

@@ -45,6 +45,7 @@ from werkzeug.utils import secure_filename
 import camtrap_banner_decoder
 from geocoding import GeocodingError
 from geocoding import reverse_geocode as lookup_address
+from video_conversion import enqueue_conversion
 
 config_filename = Path(__file__).with_name(".env")
 
@@ -399,13 +400,10 @@ def export_fototrappole_csv():
 
 
 def video_preview_url(filename, create=False):
-    """Return a browser preview URL, preserving uploaded AVI files unchanged."""
+    """Return a cached 640-pixel-wide preview for any uploaded video."""
     filename = Path(filename).name
-    if Path(filename).suffix.lower() != ".avi":
-        return url_for("uploaded_file", filename=filename)
-
     source = Path(app.config["UPLOAD_FOLDER"]) / filename
-    preview = source.with_name(source.name + ".preview.mp4")
+    preview = source.with_name(source.name + ".preview-640.mp4")
     temporary = None
     try:
         if (
@@ -421,7 +419,7 @@ def video_preview_url(filename, create=False):
             [
                 "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                 "-i", str(source), "-map", "0:v:0", "-map", "0:a:0?",
-                "-vf", "scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:out_range=tv",
+                "-vf", "scale=w='trunc(min(640,iw)/2)*2':h=-2:out_range=tv",
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
                 "-pix_fmt", "yuv420p", "-color_range", "tv", "-threads", "2",
                 "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
@@ -439,6 +437,42 @@ def video_preview_url(filename, create=False):
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def start_conversion_worker():
+    """Start an independent worker; a database advisory lock prevents duplicates."""
+    try:
+        log_file = Path(app.instance_path) / "video-conversion.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        with log_file.open("ab") as output:
+            subprocess.Popen(
+                [sys.executable, str(Path(__file__).parent / "scripts/run_video_conversions.py"), "--watch"],
+                cwd=Path(__file__).parent, stdin=subprocess.DEVNULL,
+                stdout=output, stderr=subprocess.STDOUT, start_new_session=True,
+            )
+    except OSError:
+        app.logger.exception("Cannot start video conversion worker; jobs remain queued")
+
+
+@app.route(APP_ROOT + "/video_conversion_status/<filename>", methods=["GET"])
+@login_required
+def video_conversion_status(filename):
+    """Expose only the current user's conversion state and completed MP4."""
+    with engine.connect() as conn:
+        job = conn.execute(text("""
+            SELECT v.status, v.output_filename, t.status AS transfer_status,
+                   EXISTS (SELECT 1 FROM media m WHERE m.new_file_name = v.source_filename) AS saved
+            FROM video_conversions v
+            LEFT JOIN archive_transfers t ON t.source_filename = v.source_filename
+            WHERE v.source_filename = :filename AND v.operator = :operator
+        """), {"filename": filename, "operator": session["username"]}).mappings().fetchone()
+    if job is None:
+        abort(404)
+    return jsonify(
+        status=job["status"],
+        transfer_status=job.get("transfer_status"), saved=bool(job.get("saved")),
+        download_url=url_for("uploaded_file", filename=job["output_filename"]) if job["status"] == "completed" else None,
+    )
 
 
 def extract_frame(video_path, time_sec):
@@ -685,11 +719,19 @@ def save_sighting():
             str(Path(app.config["UPLOAD_FOLDER"]) / Path(new_file_name)), 1
         )
 
+        # Use the same queue-row lock as completion to avoid missing the MP4 link.
+        conversion = conn.execute(text("""
+            SELECT status, output_filename FROM video_conversions
+            WHERE source_filename = :source AND operator = :operator FOR UPDATE
+        """), {"source": new_file_name, "operator": session["username"]}).mappings().fetchone()
+        converted_file_name = (
+            conversion["output_filename"] if conversion and conversion["status"] == "completed" else None
+        )
         query = text("""
             INSERT INTO media
-                (original_file_name, new_file_name, file_content_md5, sighting_id, image)
+                (original_file_name, new_file_name, file_content_md5, sighting_id, image, converted_file_name)
             VALUES
-                (:original_file_name, :new_file_name, :file_content_md5, :sighting_id, :image)
+                (:original_file_name, :new_file_name, :file_content_md5, :sighting_id, :image, :converted_file_name)
         """)
 
         result = conn.execute(
@@ -700,12 +742,14 @@ def save_sighting():
                 "file_content_md5": file_content_md5,
                 "sighting_id": sighting_id,
                 "image": jpg_content,
+                "converted_file_name": converted_file_name,
             },
         )
         conn.commit()
 
         flash("Avistamento salvato.", "success")
 
+    start_conversion_worker()
     return redirect(url_for("index"))
 
 
@@ -873,7 +917,7 @@ def upload_video():
     app.logger.info(f"{original_file_name=}")
 
     # get new file name
-    new_file_name = Path(f"{int(time.time())}_{session['username']}").with_suffix(
+    new_file_name = Path(f"{int(time.time())}_{secure_filename(session['username'])}_{secrets.token_hex(6)}").with_suffix(
         Path(original_file_name).suffix
     )
     app.logger.info(f"{new_file_name=}")
@@ -881,6 +925,9 @@ def upload_video():
     save_path = Path(app.config["UPLOAD_FOLDER"]) / new_file_name
     video.save(save_path)
 
+    with engine.begin() as conn:
+        enqueue_conversion(conn, str(new_file_name), session["username"], file_content_md5)
+    start_conversion_worker()
     video_url = video_preview_url(new_file_name, create=True)
     flash("Video caricato con successo!", "success")
 
@@ -942,7 +989,7 @@ def view(sighting_id: int):
     with engine.connect() as conn:
         query = text(
             (
-                "SELECT sighting.id, code, operator, camtrap_id, scalp, image, wolf_number , notes "
+                "SELECT sighting.id, code, operator, camtrap_id, scalp, image, wolf_number, notes, media.new_file_name "
                 "FROM media, sighting WHERE sighting.id = media.sighting_id AND sighting.id = :sighting_id"
             )
         )
@@ -954,6 +1001,7 @@ def view(sighting_id: int):
         row=row,
         user=user["fullname"],
         institution=user["institution"],
+        new_file_name=row["new_file_name"] if row["operator"] == session["username"] else None,
         data_uri=f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}",
     )
 

@@ -1,4 +1,4 @@
-"""Verify AVI previews preserve originals and do not block sighting entry."""
+"""Verify synchronous previews preserve originals and do not block sighting entry."""
 
 import hashlib
 import io
@@ -42,21 +42,23 @@ class VideoPreviewTests(unittest.TestCase):
         context.push()
         self.addCleanup(context.pop)
 
-    def test_mp4_is_served_without_conversion(self):
+    def test_mp4_gets_its_own_preview(self):
+        (self.folder / "sample.mp4").write_bytes(b"original")
+        (self.folder / "sample.mp4.preview-640.mp4").write_bytes(b"preview")
         with patch.object(self.main.subprocess, "run") as run:
             self.assertEqual(
                 self.main.video_preview_url("sample.mp4", create=True),
-                self.main.url_for("uploaded_file", filename="sample.mp4"),
+                self.main.url_for("uploaded_file", filename="sample.mp4.preview-640.mp4"),
             )
             run.assert_not_called()
 
     def test_cached_avi_preview_is_reused(self):
         (self.folder / "sample.AVI").write_bytes(b"original")
-        (self.folder / "sample.AVI.preview.mp4").write_bytes(b"preview")
+        (self.folder / "sample.AVI.preview-640.mp4").write_bytes(b"preview")
         with patch.object(self.main.subprocess, "run") as run:
             self.assertEqual(
                 self.main.video_preview_url("sample.AVI", create=True),
-                self.main.url_for("uploaded_file", filename="sample.AVI.preview.mp4"),
+                self.main.url_for("uploaded_file", filename="sample.AVI.preview-640.mp4"),
             )
             run.assert_not_called()
 
@@ -65,6 +67,27 @@ class VideoPreviewTests(unittest.TestCase):
         with patch.object(self.main.subprocess, "run") as run:
             self.assertIsNone(self.main.video_preview_url("sample.avi"))
             run.assert_not_called()
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg tools are required")
+    def test_avi_and_mp4_previews_are_640_pixels_wide(self):
+        for extension, codec in (("avi", "mjpeg"), ("mp4", "libx264")):
+            with self.subTest(extension=extension):
+                source = self.folder / ("wide." + extension)
+                subprocess.run([
+                    "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
+                    "-f", "lavfi", "-i", "testsrc2=size=800x450:rate=10",
+                    "-t", "0.2", "-c:v", codec, "-threads", "1", str(source),
+                ], check=True, capture_output=True, timeout=15)
+                original = source.read_bytes()
+                self.assertIsNotNone(self.main.video_preview_url(source.name, create=True))
+                result = subprocess.run([
+                    "ffprobe", "-v", "error", "-select_streams", "v:0",
+                    "-show_entries", "stream=width,height", "-of", "json",
+                    str(source.with_name(source.name + ".preview-640.mp4")),
+                ], check=True, capture_output=True, text=True, timeout=10)
+                stream = json.loads(result.stdout)["streams"][0]
+                self.assertEqual((stream["width"], stream["height"]), (640, 360))
+                self.assertEqual(source.read_bytes(), original)
 
     def test_conversion_failures_clean_up_and_preserve_original(self):
         source = self.folder / "sample.avi"
@@ -94,6 +117,7 @@ class VideoPreviewTests(unittest.TestCase):
         with (
             patch.object(self.main, "engine", engine),
             patch.object(self.main, "get_user", return_value=account),
+            patch.object(self.main, "start_conversion_worker") as start_worker,
             patch.object(self.main.subprocess, "run", side_effect=subprocess.TimeoutExpired("ffmpeg", 15)),
             patch.object(self.main.camtrap_banner_decoder, "extract_date_time", return_value={"date": "2026-11-13", "time": "123456"}) as extract,
         ):
@@ -103,6 +127,7 @@ class VideoPreviewTests(unittest.TestCase):
                 content_type="multipart/form-data",
             )
         self.assertEqual(response.status_code, 200)
+        start_worker.assert_called_once()
         html = response.get_data(as_text=True)
         self.assertIn("Anteprima non disponibile", html)
         self.assertIn("Scarica il video originale", html)
@@ -122,7 +147,7 @@ class VideoPreviewTests(unittest.TestCase):
         ], check=True, capture_output=True, timeout=15)
         original = source.read_bytes()
         url = self.main.video_preview_url(source.name, create=True)
-        preview = self.folder / "sample.avi.preview.mp4"
+        preview = self.folder / "sample.avi.preview-640.mp4"
         self.assertEqual(url, self.main.url_for("uploaded_file", filename=preview.name))
         self.assertEqual(source.read_bytes(), original)
         result = subprocess.run([

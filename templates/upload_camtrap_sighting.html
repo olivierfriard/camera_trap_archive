@@ -86,6 +86,8 @@
             </div>
             {% endif %}
 
+            {% include "archive_status.html" %}
+
             <form id="uploadForm" method="post" action="{{ url_for('save_sighting') }}" enctype="multipart/form-data">
                 <input type="hidden" name="original_file_name" value="{{ original_file_name }}" />
                 <input type="hidden" name="new_file_name" value="{{ new_file_name }}" />
@@ -189,6 +191,7 @@
 
         </div>
     </section>
+
 
 
 

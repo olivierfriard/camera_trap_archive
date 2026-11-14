@@ -1,0 +1,55 @@
+            {% if new_file_name %}
+            <div class="box">
+                <h2 class="subtitle is-5">Preparazione MP4 per l'archivio</h2>
+                <p id="conversionStatus" role="status" aria-live="polite">Verifica della conversione…</p>
+                <p id="transferStatus" class="mt-2" role="status" aria-live="polite"></p>
+                <a id="archiveDownload" class="button is-small mt-3 is-hidden" download>Scarica MP4 compresso</a>
+            </div>
+            {% endif %}
+    {% if new_file_name %}
+    <script>
+        const conversionStatus = document.getElementById("conversionStatus");
+        const archiveDownload = document.getElementById("archiveDownload");
+        const transferStatus = document.getElementById("transferStatus");
+        const conversionStatusUrl = {{ url_for('video_conversion_status', filename=new_file_name) | tojson }};
+        async function refreshConversionStatus() {
+            try {
+                const response = await fetch(conversionStatusUrl, {cache: "no-store", redirect: "error"});
+                if (response.status === 404) {
+                    conversionStatus.textContent = "Conversione non programmata per questo video.";
+                    return;
+                }
+                if (!response.ok) throw new Error("Cannot read conversion status");
+                const data = await response.json();
+                const transferMessages = {
+                    pending: "Trasferimento su Google Drive in attesa.",
+                    processing: "Trasferimento su Google Drive in corso.",
+                    completed: "MP4 archiviato su Google Drive e verificato.",
+                    failed: "Trasferimento su Google Drive non riuscito. Il file locale è conservato.",
+                };
+                transferStatus.textContent = transferMessages[data.transfer_status] || (
+                    data.saved ? "Trasferimento previsto dopo la conversione." : "Il trasferimento su Google Drive inizierà dopo il salvataggio dei dati."
+                );
+                if (data.status === "completed") {
+                    conversionStatus.textContent = "MP4 compresso pronto per l'archivio.";
+                    archiveDownload.href = data.download_url;
+                    archiveDownload.classList.remove("is-hidden");
+                    if (!data.saved || data.transfer_status === "completed" || data.transfer_status === "failed") return;
+                }
+                if (data.status === "failed") {
+                    conversionStatus.textContent = "Conversione non riuscita. Puoi comunque salvare i dati; il video originale è conservato.";
+                    return;
+                }
+                if (data.status !== "completed") {
+                    conversionStatus.textContent = data.status === "processing"
+                        ? "Conversione in corso. Puoi compilare e salvare i dati senza attendere."
+                        : "Conversione in attesa. Puoi compilare e salvare i dati senza attendere.";
+                }
+            } catch (error) {
+                conversionStatus.textContent = "Stato della conversione temporaneamente non disponibile.";
+            }
+            setTimeout(refreshConversionStatus, 5000);
+        }
+        refreshConversionStatus();
+    </script>
+    {% endif %}
