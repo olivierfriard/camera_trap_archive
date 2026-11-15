@@ -1,3 +1,4 @@
+{% from "fototrappola_coordinates.html" import coordinates, coordinate_scripts %}
 <!doctype html>
 <html lang="it">
     <head>
@@ -64,9 +65,8 @@
                                         {{ detail('ID fototrappola', sighting.camtrap_id) }}
                                         {{ detail('Numero di lupi', sighting.wolf_number) }}
                                         {{ detail('SCALP', sighting.scalp) }}
-                                        {{ detail('Latitudine', sighting.latitude) }}
-                                        {{ detail('Longitudine', sighting.longitude) }}
                                     </dl>
+                                    {{ coordinates(sighting.latitude, sighting.longitude) }}
                                     <p class="has-text-weight-semibold">Note</p>
                                     <p class="sighting-notes mb-4">{{ sighting.notes if sighting.notes else 'Nessuna nota.' }}</p>
                                     <a class="button is-link is-small" href="{{ url_for('view', sighting_id=sighting.id) }}">Apri scheda</a>
@@ -80,5 +80,6 @@
             </div>
         </main>
         {% include "footer.html" %}
+        {{ coordinate_scripts() }}
     </body>
 </html>

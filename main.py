@@ -852,9 +852,10 @@ def sighting_list():
     with engine.connect() as conn:
         query = text("""
             SELECT s.id, s.code, s.timestamp, s.camtrap_id, s.wolf_number,
-                   s.scalp, s.latitude, s.longitude, s.notes,
+                   s.scalp, f.latitudine AS latitude, f.longitudine AS longitude, s.notes,
                    m.image, m.new_file_name
             FROM sighting s JOIN media m ON m.sighting_id = s.id
+            LEFT JOIN fototrappole f ON f.codice = s.camtrap_id AND f.operator = s.operator
             WHERE s.operator = :operator
             ORDER BY s.timestamp DESC NULLS LAST, s.id DESC, m.id DESC
         """)
@@ -996,12 +997,14 @@ def uploaded_file(filename):
 @login_required
 def view(sighting_id: int):
     with engine.connect() as conn:
-        query = text(
-            (
-                "SELECT sighting.id, code, operator, camtrap_id, scalp, image, wolf_number, notes, media.new_file_name "
-                "FROM media, sighting WHERE sighting.id = media.sighting_id AND sighting.id = :sighting_id"
-            )
-        )
+        query = text("""
+            SELECT s.id, s.code, s.operator, s.camtrap_id, s.scalp, m.image,
+                   s.wolf_number, s.notes, m.new_file_name,
+                   f.latitudine AS latitude, f.longitudine AS longitude
+            FROM sighting s JOIN media m ON m.sighting_id = s.id
+            LEFT JOIN fototrappole f ON f.codice = s.camtrap_id AND f.operator = s.operator
+            WHERE s.id = :sighting_id
+        """)
         row = conn.execute(query, {"sighting_id": sighting_id}).mappings().fetchone()
 
     user = get_user(row["operator"])

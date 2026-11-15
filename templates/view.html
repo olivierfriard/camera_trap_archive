@@ -1,3 +1,4 @@
+{% from "fototrappola_coordinates.html" import coordinates, coordinate_scripts %}
 <!doctype html>
 <html lang="it">
     <head>
@@ -30,6 +31,10 @@
 
 Id fototrappola: <b>{{ row.camtrap_id }}</b><br>
 
+<div class="box mt-4">
+    {{ coordinates(row.latitude, row.longitude) }}
+</div>
+
 Number of wolves; <b>{{ row.wolf_number }}</b><br>
 
 SCALP: <b>{{ row.scalp }}</b><br>
@@ -45,5 +50,6 @@ Note: {{ row.notes if row.notes is not none else ''}}
 
             </div>
         </section>
+        {{ coordinate_scripts() }}
     </body>
 </html>

@@ -42,6 +42,8 @@ class SightingListTests(unittest.TestCase):
                 )
             """))
             conn.execute(text("CREATE TABLE media (id INTEGER PRIMARY KEY, sighting_id INTEGER, image BLOB, new_file_name TEXT)"))
+            conn.execute(text("CREATE TABLE fototrappole (codice TEXT, operator TEXT, latitudine REAL, longitudine REAL)"))
+            conn.execute(text("INSERT INTO fototrappole VALUES ('FT01', 'user', 0, 7.6)"))
         account = dict(username="user", fullname="Nome Utente", institution="Test", code="T", is_active=True, is_admin=False)
         for patcher in (
             patch.object(self.main, "engine", self.database),
@@ -124,6 +126,46 @@ class SightingListTests(unittest.TestCase):
         self.assertIn("&lt;script&gt;", html)
         self.assertIn("Seconda riga", html)
         self.assertIn("Utente: Nome Utente", html)
+
+    def test_list_and_detail_use_camera_trap_coordinates_with_operator_match(self):
+        self.add_sighting()
+        with self.database.begin() as conn:
+            conn.execute(text("UPDATE fototrappole SET latitudine=45.0703, longitudine=7.6869 WHERE operator='user'"))
+            conn.execute(text("INSERT INTO fototrappole VALUES ('FT01', 'someone-else', 66, 77)"))
+        listing = self.get_list()
+        response = self.client.get(self.main.APP_ROOT + "/view/1")
+        self.assertEqual(response.status_code, 200)
+        for html in (listing, response.get_data(as_text=True)):
+            self.assertIn('data-latitude="45.0703"', html)
+            self.assertIn('data-longitude="7.6869"', html)
+            self.assertIn("Coordinate della fototrappola", html)
+            self.assertIn("Zona UTM", html)
+            self.assertIn("Est UTM (m)", html)
+            self.assertIn("Nord UTM (m)", html)
+            self.assertIn("utm-display.js", html)
+            self.assertNotIn('data-latitude="66', html)
+        self.assertEqual(listing.count("<article"), 1)
+
+    def test_missing_camera_trap_does_not_use_sighting_or_other_users_coordinates(self):
+        self.add_sighting()
+        with self.database.begin() as conn:
+            conn.execute(text("DELETE FROM fototrappole WHERE operator='user'"))
+            conn.execute(text("INSERT INTO fototrappole VALUES ('FT01', 'someone-else', 66, 77)"))
+        for response in (self.client.get(self.main.APP_ROOT + "/sighting_list"), self.client.get(self.main.APP_ROOT + "/view/1")):
+            self.assertEqual(response.status_code, 200)
+            html = response.get_data(as_text=True)
+            self.assertIn('data-latitude="" data-longitude=""', html)
+            self.assertIn("Non indicato", html)
+            self.assertNotIn('data-longitude="7.6"', html)
+
+    def test_zero_and_partial_camera_trap_coordinates_remain_distinguishable(self):
+        self.add_sighting()
+        self.assertIn('data-latitude="0.0" data-longitude="7.6"', self.get_list())
+        with self.database.begin() as conn:
+            conn.execute(text("UPDATE fototrappole SET latitudine=NULL WHERE operator='user'"))
+        html = self.get_list()
+        self.assertIn('data-latitude="" data-longitude="7.6"', html)
+        self.assertIn("<dd>Non indicato</dd>", html)
 
     def test_empty_list_and_authentication(self):
         self.assertIn("Nessun avvistamento registrato", self.get_list())
