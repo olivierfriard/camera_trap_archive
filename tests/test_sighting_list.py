@@ -57,12 +57,12 @@ class SightingListTests(unittest.TestCase):
         with self.client.session_transaction() as session:
             session["username"] = "user"
 
-    def add_sighting(self, id=1, code="TEST", timestamp="2026-11-15T12:34:56+00:00", operator="user", image=b"database image", filename="sample.mp4", notes="Nota di prova"):
+    def add_sighting(self, id=1, code="TEST", timestamp="2026-11-15T12:34:56+00:00", operator="user", image=b"database image", filename="sample.mp4", notes="Nota di prova", latitude=None, longitude=None):
         with self.database.begin() as conn:
             conn.execute(text("""
                 INSERT INTO sighting VALUES
-                    (:id, :code, :timestamp, 'FT01', 0, 'C1', 0, 7.6, :notes, :operator)
-            """), dict(id=id, code=code, timestamp=timestamp, notes=notes, operator=operator))
+                    (:id, :code, :timestamp, 'FT01', 0, 'C1', :latitude, :longitude, :notes, :operator)
+            """), dict(id=id, code=code, timestamp=timestamp, notes=notes, operator=operator, latitude=latitude, longitude=longitude))
             conn.execute(text("INSERT INTO media VALUES (:id, :id, :image, :filename)"), dict(id=id, image=image, filename=filename))
 
     def get_list(self):
@@ -138,7 +138,8 @@ class SightingListTests(unittest.TestCase):
         for html in (listing, response.get_data(as_text=True)):
             self.assertIn('data-latitude="45.0703"', html)
             self.assertIn('data-longitude="7.6869"', html)
-            self.assertIn("Coordinate della fototrappola", html)
+            self.assertIn("Coordinate (WGS84)", html)
+            self.assertIn('<span class="tag is-light">fototrappola</span>', html)
             self.assertIn("Zona UTM", html)
             self.assertIn("Est UTM (m)", html)
             self.assertIn("Nord UTM (m)", html)
@@ -166,6 +167,40 @@ class SightingListTests(unittest.TestCase):
         html = self.get_list()
         self.assertIn('data-latitude="" data-longitude="7.6"', html)
         self.assertIn("<dd>Non indicato</dd>", html)
+
+    def test_saved_coordinates_take_priority_and_do_not_follow_camera_changes(self):
+        self.add_sighting(latitude=45.1, longitude=7.2)
+        with self.database.begin() as conn:
+            conn.execute(text("UPDATE fototrappole SET latitudine=50, longitudine=10"))
+        for response in (self.client.get(self.main.APP_ROOT + "/sighting_list"), self.client.get(self.main.APP_ROOT + "/view/1")):
+            self.assertEqual(response.status_code, 200)
+            html = response.get_data(as_text=True)
+            self.assertIn('data-latitude="45.1" data-longitude="7.2"', html)
+            self.assertNotIn('<span class="tag is-light">fototrappola</span>', html)
+
+    def test_incomplete_saved_pair_uses_entire_camera_pair(self):
+        self.add_sighting(latitude=44, longitude=None)
+        html = self.get_list()
+        self.assertIn('data-latitude="0.0" data-longitude="7.6"', html)
+        self.assertNotIn('data-latitude="44', html)
+        self.assertIn('<span class="tag is-light">fototrappola</span>', html)
+
+    def test_saved_zero_coordinates_are_available_without_camera(self):
+        self.add_sighting(latitude=0, longitude=0)
+        with self.database.begin() as conn:
+            conn.execute(text("DELETE FROM fototrappole"))
+        self.assertIn('data-latitude="0.0" data-longitude="0.0"', self.get_list())
+
+    def test_camera_selection_scopes_coordinates_to_logged_in_user(self):
+        with self.database.begin() as conn:
+            conn.execute(text("INSERT INTO fototrappole VALUES ('PRIVATE', 'someone-else', 66, 77)"))
+        url = "/get_fototrappola_data"
+        self.assertEqual(self.main.app.test_client().get(url + "?camtrap_id=FT01").status_code, 302)
+        self.assertEqual(self.client.get(url).data, b"")
+        self.assertEqual(self.client.get(url + "?camtrap_id=PRIVATE").status_code, 404)
+        response = self.client.get(url + "?camtrap_id=FT01&operator=someone-else")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('data-latitude="0.0" data-longitude="7.6"', response.get_data(as_text=True))
 
     def test_empty_list_and_authentication(self):
         self.assertIn("Nessun avvistamento registrato", self.get_list())

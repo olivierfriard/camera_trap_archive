@@ -8,7 +8,6 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from dotenv import dotenv_values
@@ -167,8 +166,9 @@ class VideoPreviewTests(unittest.TestCase):
         connection = MagicMock()
         connection.execute.return_value.scalar.return_value = 1
         connection.execute.return_value.mappings.return_value.all.return_value = []
-        connection.execute.return_value.mappings.return_value.fetchone.return_value = SimpleNamespace(
-            tipo="Test", nome="Name", cognome="Surname", comune="Torino", provincia="Torino", regione="Piemonte",
+        connection.execute.return_value.mappings.return_value.fetchone.return_value = dict(
+            codice="FT01", tipo="Test", nome="Name", cognome="Surname", comune="Torino", provincia="Torino", regione="Piemonte",
+            latitudine=None, longitudine=None,
         )
         engine = MagicMock()
         engine.connect.return_value.__enter__.return_value = connection

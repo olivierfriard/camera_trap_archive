@@ -32,7 +32,7 @@
 Id fototrappola: <b>{{ row.camtrap_id }}</b><br>
 
 <div class="box mt-4">
-    {{ coordinates(row.latitude, row.longitude) }}
+    {{ coordinates(row.latitude, row.longitude, row.coordinate_source) }}
 </div>
 
 Number of wolves; <b>{{ row.wolf_number }}</b><br>

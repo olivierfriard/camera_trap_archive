@@ -1,0 +1,32 @@
+<fieldset class="box" id="sightingCoordinates" data-preserve-coordinates="{{ 'true' if latitude is defined else 'false' }}">
+    <legend class="title is-5">Coordinate dell'avvistamento (WGS84)</legend>
+    <span id="sightingCoordinateSource" class="tag is-light mb-3 is-hidden">fototrappola</span>
+    <div class="columns is-multiline">
+        <div class="column is-half">
+            <label class="label" for="sightingLatitude">Latitudine</label>
+            <input class="input" id="sightingLatitude" name="latitude" type="text" inputmode="decimal" value="{{ latitude if latitude is defined and latitude is not none else '' }}" />
+        </div>
+        <div class="column is-half">
+            <label class="label" for="sightingLongitude">Longitudine</label>
+            <input class="input" id="sightingLongitude" name="longitude" type="text" inputmode="decimal" value="{{ longitude if longitude is defined and longitude is not none else '' }}" />
+        </div>
+        <div class="column is-one-third">
+            <label class="label" for="sightingUtmZone">Zona UTM</label>
+            <input class="input" id="sightingUtmZone" name="utm_zone" type="text" maxlength="3" placeholder="32T" />
+        </div>
+        <div class="column is-one-third">
+            <label class="label" for="sightingUtmEast">Est UTM (m)</label>
+            <input class="input" id="sightingUtmEast" name="utm_easting" type="number" step="any" />
+        </div>
+        <div class="column is-one-third">
+            <label class="label" for="sightingUtmNorth">Nord UTM (m)</label>
+            <input class="input" id="sightingUtmNorth" name="utm_northing" type="number" step="any" />
+        </div>
+    </div>
+    <p class="help mb-3" id="sightingCoordinateStatus" role="status" aria-live="polite"></p>
+    <button class="button is-small" type="button" id="sightingMapToggle" aria-expanded="false" aria-controls="sightingMapPanel">Mostra mappa</button>
+    <div id="sightingMapPanel" class="mt-3" hidden>
+        <div id="sightingMap" style="height: 240px; width: 100%; border-radius: 6px;"></div>
+        <p class="help">Clicca sulla mappa o trascina il punto per modificare le coordinate dell'avvistamento.</p>
+    </div>
+</fieldset>

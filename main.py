@@ -507,26 +507,23 @@ def extract_frame(video_path, time_sec):
 
 
 @app.route("/get_fototrappola_data", methods=["GET"])
+@login_required
 def get_fototrappola_data():
     camtrap_id = request.args.get("camtrap_id")
     if not camtrap_id:
         return ""
-    print(f"{camtrap_id=}")
     with engine.connect() as conn:
         fototrappola = (
             conn.execute(
-                text("SELECT * FROM fototrappole WHERE codice = :codice"),
-                {"codice": camtrap_id},
+                text("SELECT * FROM fototrappole WHERE codice = :codice AND operator = :operator"),
+                {"codice": camtrap_id, "operator": session["username"]},
             )
             .mappings()
             .fetchone()
         )
-    out = (
-        f"{fototrappola.tipo}<br>{fototrappola.nome} {fototrappola.cognome}<br>"
-        f"{fototrappola.comune} {fototrappola.provincia} {fototrappola.regione}"
-    )
-
-    return out
+    if fototrappola is None:
+        abort(404)
+    return render_template("fototrappola_details.html", fototrappola=fototrappola)
 
 
 @app.route(APP_ROOT + "/nuova_fototrappola", methods=["GET", "POST"])
@@ -587,6 +584,7 @@ def save_sighting():
     notes = request.form.get("note") if request.form.get("note") else None
     latitude = request.form.get("latitude")
     longitude = request.form.get("longitude")
+    coordinates_submitted = "latitude" in request.form or "longitude" in request.form
     transect_id = (
         request.form.get("transect_id") if request.form.get("transect_id") else None
     )
@@ -618,10 +616,35 @@ def save_sighting():
     video_url = video_preview_url(new_file_name)
 
     with engine.connect() as conn:
+        fototrappola = None
+        if camtrap_id:
+            fototrappola = conn.execute(
+                text("SELECT * FROM fototrappole WHERE codice = :codice AND operator = :operator"),
+                {"codice": camtrap_id, "operator": session["username"]},
+            ).mappings().fetchone()
+        invalid_camera = bool(camtrap_id) and fototrappola is None
+        if not coordinates_submitted and fototrappola is not None:
+            latitude = fototrappola["latitudine"]
+            longitude = fototrappola["longitudine"]
+        invalid_coordinates = False
+        coordinate_values = (latitude, longitude)
+        if all(value is None or str(value).strip() == "" for value in coordinate_values):
+            latitude = longitude = None
+        else:
+            try:
+                parsed_latitude, parsed_longitude = map(float, coordinate_values)
+                if not (
+                    math.isfinite(parsed_latitude) and math.isfinite(parsed_longitude)
+                    and -90 <= parsed_latitude <= 90 and -180 <= parsed_longitude <= 180
+                ):
+                    raise ValueError("Invalid sighting coordinates")
+                latitude, longitude = parsed_latitude, parsed_longitude
+            except (TypeError, ValueError, OverflowError):
+                invalid_coordinates = True
         # check if code already present in database
         query = text("SELECT COUNT(*) FROM sighting WHERE code = :code")
         n_code = conn.execute(query, {"code": code}).scalar()
-        if n_code or invalid_timestamp:
+        if n_code or invalid_timestamp or invalid_coordinates or invalid_camera:
             if n_code:
                 flash(
                     Markup(
@@ -635,6 +658,10 @@ def save_sighting():
                     f"nel fuso orario {app.config['SIGHTING_TIMEZONE']}.",
                     "danger",
                 )
+            if invalid_coordinates:
+                flash("Coordinate non valide. Compila entrambe le coordinate, con latitudine tra -90 e 90 e longitudine tra -180 e 180, oppure lascia entrambe vuote.", "danger")
+            if invalid_camera:
+                flash("La fototrappola selezionata non è disponibile per il tuo utente.", "danger")
 
             # list of fototrappole
             with engine.connect() as conn:
@@ -647,23 +674,6 @@ def save_sighting():
                     )
                     .mappings()
                     .all()
-                )
-
-                fototrappola = (
-                    conn.execute(
-                        text("SELECT * FROM fototrappole WHERE codice = :camtrap_id"),
-                        {"camtrap_id": camtrap_id},
-                    )
-                    .mappings()
-                    .fetchone()
-                )
-                fototrappola_details = (
-                    (
-                        f"{fototrappola.tipo}<br>{fototrappola.nome} {fototrappola.cognome}<br>"
-                        f"{fototrappola.comune} {fototrappola.provincia} {fototrappola.regione}"
-                    )
-                    if fototrappola is not None
-                    else ""
                 )
 
             return render_template(
@@ -684,7 +694,7 @@ def save_sighting():
                 transect_id=transect_id if transect_id is not None else "",
                 scalp=scalp,
                 fototrappole=fototrappole,
-                fototrappola_details=Markup(fototrappola_details),
+                fototrappola=fototrappola,
             )
 
         query = text("""
@@ -852,7 +862,15 @@ def sighting_list():
     with engine.connect() as conn:
         query = text("""
             SELECT s.id, s.code, s.timestamp, s.camtrap_id, s.wolf_number,
-                   s.scalp, f.latitudine AS latitude, f.longitudine AS longitude, s.notes,
+                   s.scalp,
+                   CASE WHEN s.latitude IS NOT NULL AND s.longitude IS NOT NULL
+                        THEN s.latitude ELSE f.latitudine END AS latitude,
+                   CASE WHEN s.latitude IS NOT NULL AND s.longitude IS NOT NULL
+                        THEN s.longitude ELSE f.longitudine END AS longitude,
+                   CASE WHEN (s.latitude IS NULL OR s.longitude IS NULL)
+                             AND (f.latitudine IS NOT NULL OR f.longitudine IS NOT NULL)
+                        THEN 'fototrappola' ELSE '' END AS coordinate_source,
+                   s.notes,
                    m.image, m.new_file_name
             FROM sighting s JOIN media m ON m.sighting_id = s.id
             LEFT JOIN fototrappole f ON f.codice = s.camtrap_id AND f.operator = s.operator
@@ -1000,7 +1018,13 @@ def view(sighting_id: int):
         query = text("""
             SELECT s.id, s.code, s.operator, s.camtrap_id, s.scalp, m.image,
                    s.wolf_number, s.notes, m.new_file_name,
-                   f.latitudine AS latitude, f.longitudine AS longitude
+                   CASE WHEN s.latitude IS NOT NULL AND s.longitude IS NOT NULL
+                        THEN s.latitude ELSE f.latitudine END AS latitude,
+                   CASE WHEN s.latitude IS NOT NULL AND s.longitude IS NOT NULL
+                        THEN s.longitude ELSE f.longitudine END AS longitude,
+                   CASE WHEN (s.latitude IS NULL OR s.longitude IS NULL)
+                             AND (f.latitudine IS NOT NULL OR f.longitudine IS NOT NULL)
+                        THEN 'fototrappola' ELSE '' END AS coordinate_source
             FROM sighting s JOIN media m ON m.sighting_id = s.id
             LEFT JOIN fototrappole f ON f.codice = s.camtrap_id AND f.operator = s.operator
             WHERE s.id = :sighting_id

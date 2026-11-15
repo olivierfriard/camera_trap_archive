@@ -8,6 +8,7 @@
 
     <!-- Bulma CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
     <style>
         #map {
@@ -113,7 +114,7 @@
                                          {% endfor %}
                                      </select>
 -->
-                                    <select name="camtrap_id" hx-get="/get_fototrappola_data" hx-trigger="change"
+                                    <select name="camtrap_id" hx-get="/get_fototrappola_data" hx-trigger="change" hx-sync="this:replace"
                                         hx-target="#details" hx-include="this">
                                         <option value="">-- scegli una fototrappola --</option>
                                         {% for foto in fototrappole %}
@@ -131,7 +132,7 @@
                     </div>
                     <div class="column is-third">
                         <div id="details" class="box">
-                            {{ fototrappola_details }}
+                            {% include "fototrappola_details.html" %}
                         </div>
                     </div>
                     <div class="column is-third">
@@ -143,6 +144,8 @@
                         </div>
                     </div>
                 </div>
+
+                {% include "sighting_coordinates_editor.html" %}
 
                 <div class="columns is-multiline">
                     <div class="column is-half">
@@ -195,6 +198,10 @@
 
 
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/proj4@2.22.0/dist/proj4.js" crossorigin="anonymous"></script>
+    <script src="{{ url_for('static', filename='js/utm-coordinates.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sighting-coordinates.js') }}"></script>
 </body>
 
 </html>

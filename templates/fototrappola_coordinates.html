@@ -1,6 +1,6 @@
-{% macro coordinates(latitude, longitude) %}
+{% macro coordinates(latitude, longitude, source='') %}
 <div data-fototrappola-coordinates data-latitude="{{ latitude if latitude is not none else '' }}" data-longitude="{{ longitude if longitude is not none else '' }}">
-    <p class="help mb-2">Coordinate della fototrappola (WGS84)</p>
+    <p class="help mb-2">Coordinate (WGS84){% if source %} — <span class="tag is-light">fototrappola</span>{% endif %}</p>
     <dl class="columns is-multiline is-mobile">
         <div class="column is-half">
             <dt class="has-text-weight-semibold">Latitudine</dt>

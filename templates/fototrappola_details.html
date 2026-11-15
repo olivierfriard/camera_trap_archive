@@ -1,0 +1,7 @@
+{% if fototrappola %}
+<div data-camera-details data-camera-id="{{ fototrappola.codice }}" data-latitude="{{ fototrappola.latitudine if fototrappola.latitudine is not none else '' }}" data-longitude="{{ fototrappola.longitudine if fototrappola.longitudine is not none else '' }}">
+    {{ fototrappola.tipo or '' }}<br />
+    {{ fototrappola.nome or '' }} {{ fototrappola.cognome or '' }}<br />
+    {{ fototrappola.comune or '' }} {{ fototrappola.provincia or '' }} {{ fototrappola.regione or '' }}
+</div>
+{% endif %}
