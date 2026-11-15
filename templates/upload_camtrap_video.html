@@ -37,32 +37,29 @@
                 <h1 class="title is-3">Nuovo avistamento fototrappola</h1>
 
                 {% with messages = get_flashed_messages(with_categories=true) %}
-                      {% if messages %}
-                        <div id="flashes">
-                          {% for category, msg in messages %}
-                            {# Map Flask categories to Bulma notification classes #}
-                            {% set bulma_class = {
-                              'success': 'is-success',
-                              'warning': 'is-warning',
-                              'info':    'is-info',
-                              'danger':  'is-danger',
-                              'error':   'is-danger'
-                            }[category] if category in ['success','warning','info','danger','error'] else 'is-light' %}
+                {% if messages %}
+                <div id="flashes">
+                    {% for category, msg in messages %} {# Map Flask categories
+                    to Bulma notification classes #} {% set bulma_class = {
+                    'success': 'is-success', 'warning': 'is-warning', 'info':
+                    'is-info', 'danger': 'is-danger', 'error': 'is-danger'
+                    }[category] if category in
+                    ['success','warning','info','danger','error'] else
+                    'is-light' %}
 
-                            <div class="notification {{ bulma_class }}">
-                              <button class="delete" aria-label="dismiss"></button>
-                              {{ msg }}
-                            </div>
-                          {% endfor %}
-                        </div>
-                      {% endif %}
-                    {% endwith %}
+                    <div class="notification {{ bulma_class }}">
+                        <button class="delete" aria-label="dismiss"></button>
+                        {{ msg }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %} {% endwith %}
                 <a class="button" href="{{ url_for('index') }}">Home</a>
                 <br /><br />
                 <form
                     id="uploadForm"
                     method="post"
-                    action="{{ url_for('upload_video') }}"
+                    action="{{ url_for('upload_camtrap_video') }}"
                     enctype="multipart/form-data"
                 >
                     <div class="field">
@@ -75,7 +72,12 @@
                                     name="video"
                                     accept="video/*"
                                     required
-                                    onchange="document.getElementById('file-name').textContent = this.files[0]?.name || ''"
+                                    onchange="
+                                        document.getElementById(
+                                            'file-name',
+                                        ).textContent =
+                                            this.files[0]?.name || ''
+                                    "
                                 />
                                 <span class="file-cta">
                                     <span class="file-icon"> 📹 </span>

@@ -283,13 +283,15 @@ def administration():
 @app.route(APP_ROOT + "/nuovo_avvistamento", methods=["GET"])
 @login_required
 def nuovo_avvistamento():
-    """Let the current user choose the source of a new sighting."""
+    """
+    Let the current user choose the source of a new sighting.
+    """
     return render_template("nuovo_avvistamento.html")
 
 
-@app.route(APP_ROOT + "/upload_video_form")
+@app.route(APP_ROOT + "/upload_camtrap_video_form")
 @login_required
-def upload_video_form():
+def upload_camtrap_video_form():
     return render_template("upload_camtrap_video.html")
 
 
@@ -407,25 +409,56 @@ def video_preview_url(filename, create=False):
     temporary = None
     try:
         if (
-            preview.is_file() and preview.stat().st_size > 0
+            preview.is_file()
+            and preview.stat().st_size > 0
             and preview.stat().st_mtime >= source.stat().st_mtime
         ):
             return url_for("uploaded_file", filename=preview.name)
         if not create:
             return None
-        with NamedTemporaryFile(dir=source.parent, suffix=".mp4", delete=False) as output:
+        with NamedTemporaryFile(
+            dir=source.parent, suffix=".mp4", delete=False
+        ) as output:
             temporary = Path(output.name)
         subprocess.run(
             [
-                "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", str(source), "-map", "0:v:0", "-map", "0:a:0?",
-                "-vf", "scale=w='trunc(min(640,iw)/2)*2':h=-2:out_range=tv",
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-                "-pix_fmt", "yuv420p", "-color_range", "tv", "-threads", "2",
-                "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+                "ffmpeg",
+                "-nostdin",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(source),
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a:0?",
+                "-vf",
+                "scale=w='trunc(min(640,iw)/2)*2':h=-2:out_range=tv",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "23",
+                "-pix_fmt",
+                "yuv420p",
+                "-color_range",
+                "tv",
+                "-threads",
+                "2",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                "-movflags",
+                "+faststart",
                 str(temporary),
             ],
-            check=True, capture_output=True, timeout=15,
+            check=True,
+            capture_output=True,
+            timeout=15,
         )
         if temporary.stat().st_size == 0:
             raise OSError("FFmpeg produced an empty preview")
@@ -446,9 +479,16 @@ def start_conversion_worker():
         log_file.parent.mkdir(parents=True, exist_ok=True)
         with log_file.open("ab") as output:
             subprocess.Popen(
-                [sys.executable, str(Path(__file__).parent / "scripts/run_video_conversions.py"), "--watch"],
-                cwd=Path(__file__).parent, stdin=subprocess.DEVNULL,
-                stdout=output, stderr=subprocess.STDOUT, start_new_session=True,
+                [
+                    sys.executable,
+                    str(Path(__file__).parent / "scripts/run_video_conversions.py"),
+                    "--watch",
+                ],
+                cwd=Path(__file__).parent,
+                stdin=subprocess.DEVNULL,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
             )
     except OSError:
         app.logger.exception("Cannot start video conversion worker; jobs remain queued")
@@ -459,19 +499,29 @@ def start_conversion_worker():
 def video_conversion_status(filename):
     """Expose only the current user's conversion state and completed MP4."""
     with engine.connect() as conn:
-        job = conn.execute(text("""
+        job = (
+            conn.execute(
+                text("""
             SELECT v.status, v.output_filename, t.status AS transfer_status,
                    EXISTS (SELECT 1 FROM media m WHERE m.new_file_name = v.source_filename) AS saved
             FROM video_conversions v
             LEFT JOIN archive_transfers t ON t.source_filename = v.source_filename
             WHERE v.source_filename = :filename AND v.operator = :operator
-        """), {"filename": filename, "operator": session["username"]}).mappings().fetchone()
+        """),
+                {"filename": filename, "operator": session["username"]},
+            )
+            .mappings()
+            .fetchone()
+        )
     if job is None:
         abort(404)
     return jsonify(
         status=job["status"],
-        transfer_status=job.get("transfer_status"), saved=bool(job.get("saved")),
-        download_url=url_for("uploaded_file", filename=job["output_filename"]) if job["status"] == "completed" else None,
+        transfer_status=job.get("transfer_status"),
+        saved=bool(job.get("saved")),
+        download_url=url_for("uploaded_file", filename=job["output_filename"])
+        if job["status"] == "completed"
+        else None,
     )
 
 
@@ -606,7 +656,9 @@ def save_sighting():
                     continue
             else:
                 raise ValueError("Invalid sighting date or time")
-            timestamp = timestamp.replace(tzinfo=ZoneInfo(app.config["SIGHTING_TIMEZONE"]))
+            timestamp = timestamp.replace(
+                tzinfo=ZoneInfo(app.config["SIGHTING_TIMEZONE"])
+            )
             # Reject local times skipped by the daylight-saving clock change.
             roundtrip = timestamp.astimezone(timezone.utc).astimezone(timestamp.tzinfo)
             if roundtrip.replace(tzinfo=None) != timestamp.replace(tzinfo=None):
@@ -730,12 +782,21 @@ def save_sighting():
         )
 
         # Use the same queue-row lock as completion to avoid missing the MP4 link.
-        conversion = conn.execute(text("""
+        conversion = (
+            conn.execute(
+                text("""
             SELECT status, output_filename FROM video_conversions
             WHERE source_filename = :source AND operator = :operator FOR UPDATE
-        """), {"source": new_file_name, "operator": session["username"]}).mappings().fetchone()
+        """),
+                {"source": new_file_name, "operator": session["username"]},
+            )
+            .mappings()
+            .fetchone()
+        )
         converted_file_name = (
-            conversion["output_filename"] if conversion and conversion["status"] == "completed" else None
+            conversion["output_filename"]
+            if conversion and conversion["status"] == "completed"
+            else None
         )
         query = text("""
             INSERT INTO media
@@ -883,22 +944,28 @@ def sighting_list():
         sighting = dict(row)
         sighting["data_uri"] = (
             f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}"
-            if row["image"] else None
+            if row["image"]
+            else None
         )
-        sighting["preview_url"] = video_preview_url(row["new_file_name"]) if row["new_file_name"] else None
+        sighting["preview_url"] = (
+            video_preview_url(row["new_file_name"]) if row["new_file_name"] else None
+        )
         sighting["date_time"] = (
-            row["timestamp"].astimezone(ZoneInfo(app.config["SIGHTING_TIMEZONE"])).strftime("%d/%m/%Y %H:%M:%S %Z")
-            if row["timestamp"] else None
+            row["timestamp"]
+            .astimezone(ZoneInfo(app.config["SIGHTING_TIMEZONE"]))
+            .strftime("%d/%m/%Y %H:%M:%S %Z")
+            if row["timestamp"]
+            else None
         )
         results.append(sighting)
     return render_template("sighting_list.html", sightings=results)
 
 
-@app.route(APP_ROOT + "/upload_video", methods=["POST"])
+@app.route(APP_ROOT + "/upload_camtrap_video", methods=["POST"])
 @login_required
-def upload_video():
+def upload_camtrap_video():
     """
-    save video
+    save camera trap video
     extract time and date info
     rename video
     """
@@ -926,7 +993,9 @@ def upload_video():
     # check if md5 already in DB
     with engine.connect() as conn:
         query = text(
-            "SELECT code, operator, camtrap_id FROM media,sighting WHERE sighting.id = media.sighting_id AND file_content_md5 = :file_content_md5"
+            "SELECT code, operator, camtrap_id "
+            "FROM media,sighting "
+            "WHERE sighting.id = media.sighting_id AND file_content_md5 = :file_content_md5"
         )
         row = (
             conn.execute(query, {"file_content_md5": file_content_md5})
@@ -938,23 +1007,25 @@ def upload_video():
                 f"Il file {video.filename} è già presente nel database: {row['operator']}, {row['code']}, {row['camtrap_id']}",
                 "danger",
             )
-            return redirect(url_for("upload_video_form"))
+            return redirect(url_for("upload_camtrap_video_form"))
 
     original_file_name = secure_filename(video.filename)
 
     app.logger.info(f"{original_file_name=}")
 
     # get new file name
-    new_file_name = Path(f"{int(time.time())}_{secure_filename(session['username'])}_{secrets.token_hex(6)}").with_suffix(
-        Path(original_file_name).suffix
-    )
+    new_file_name = Path(
+        f"{int(time.time())}_{secure_filename(session['username'])}_{secrets.token_hex(6)}"
+    ).with_suffix(Path(original_file_name).suffix)
     app.logger.info(f"{new_file_name=}")
 
     save_path = Path(app.config["UPLOAD_FOLDER"]) / new_file_name
     video.save(save_path)
 
     with engine.begin() as conn:
-        enqueue_conversion(conn, str(new_file_name), session["username"], file_content_md5)
+        enqueue_conversion(
+            conn, str(new_file_name), session["username"], file_content_md5
+        )
     start_conversion_worker()
     video_url = video_preview_url(new_file_name, create=True)
     flash("Video caricato con successo!", "success")
@@ -1037,7 +1108,9 @@ def view(sighting_id: int):
         row=row,
         user=user["fullname"],
         institution=user["institution"],
-        new_file_name=row["new_file_name"] if row["operator"] == session["username"] else None,
+        new_file_name=row["new_file_name"]
+        if row["operator"] == session["username"]
+        else None,
         data_uri=f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}",
     )
 
