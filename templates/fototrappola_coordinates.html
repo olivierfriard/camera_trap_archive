@@ -1,0 +1,34 @@
+{% macro coordinates(latitude, longitude) %}
+<div data-fototrappola-coordinates data-latitude="{{ latitude if latitude is not none else '' }}" data-longitude="{{ longitude if longitude is not none else '' }}">
+    <p class="help mb-2">Coordinate della fototrappola (WGS84)</p>
+    <dl class="columns is-multiline is-mobile">
+        <div class="column is-half">
+            <dt class="has-text-weight-semibold">Latitudine</dt>
+            <dd>{{ latitude if latitude is not none else 'Non indicato' }}</dd>
+        </div>
+        <div class="column is-half">
+            <dt class="has-text-weight-semibold">Longitudine</dt>
+            <dd>{{ longitude if longitude is not none else 'Non indicato' }}</dd>
+        </div>
+        <div class="column is-one-third">
+            <dt class="has-text-weight-semibold">Zona UTM</dt>
+            <dd data-utm-zone>Non indicato</dd>
+        </div>
+        <div class="column is-one-third">
+            <dt class="has-text-weight-semibold">Est UTM (m)</dt>
+            <dd data-utm-east>Non indicato</dd>
+        </div>
+        <div class="column is-one-third">
+            <dt class="has-text-weight-semibold">Nord UTM (m)</dt>
+            <dd data-utm-north>Non indicato</dd>
+        </div>
+    </dl>
+    <p class="help" data-utm-message role="status" aria-live="polite"></p>
+</div>
+{% endmacro %}
+
+{% macro coordinate_scripts() %}
+<script src="https://cdn.jsdelivr.net/npm/proj4@2.22.0/dist/proj4.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/utm-coordinates.js') }}"></script>
+<script src="{{ url_for('static', filename='js/utm-display.js') }}"></script>
+{% endmacro %}
