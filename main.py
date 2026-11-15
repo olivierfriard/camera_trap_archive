@@ -850,19 +850,28 @@ def save_fototrappola():
 @login_required
 def sighting_list():
     with engine.connect() as conn:
-        query = text(
-            "SELECT code, operator, camtrap_id, image FROM sighting, media WHERE sighting.id=media.sighting_id AND operator = :operator"
-        )
+        query = text("""
+            SELECT s.id, s.code, s.timestamp, s.camtrap_id, s.wolf_number,
+                   s.scalp, s.latitude, s.longitude, s.notes,
+                   m.image, m.new_file_name
+            FROM sighting s JOIN media m ON m.sighting_id = s.id
+            WHERE s.operator = :operator
+            ORDER BY s.timestamp DESC NULLS LAST, s.id DESC, m.id DESC
+        """)
         rows = conn.execute(query, {"operator": session["username"]}).mappings().all()
     results = []
     for row in rows:
-        results.append(
-            {
-                # "image": base64.b64encode(row["image"]).decode("ascii"),
-                "data_uri": f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}",
-                "code": row["code"],
-            }
+        sighting = dict(row)
+        sighting["data_uri"] = (
+            f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}"
+            if row["image"] else None
         )
+        sighting["preview_url"] = video_preview_url(row["new_file_name"]) if row["new_file_name"] else None
+        sighting["date_time"] = (
+            row["timestamp"].astimezone(ZoneInfo(app.config["SIGHTING_TIMEZONE"])).strftime("%d/%m/%Y %H:%M:%S %Z")
+            if row["timestamp"] else None
+        )
+        results.append(sighting)
     return render_template("sighting_list.html", sightings=results)
 
 
