@@ -24,11 +24,12 @@
                         <th>Data fine</th>
                         <th>Intersezione</th>
                         <th>Coordinate</th>
+                        <th>Azioni</th>
                     </tr>
                 </thead>
                 {% for foto in fototrappole %}
                 <tr>
-                    <td><a href="{{ url_for('edit_fototrappola', codice=foto.codice) }}">{{ foto.codice }}</a></td>
+                    <td><a href="{{ url_for('sighting_list', camtrap_id=foto.codice) }}">{{ foto.codice }}</a></td>
                     <td>{{ foto.tipo }}</td>
                     <td>{{ foto.nome }} {{ foto.cognome }}</td>
                     <td>{{ foto.data_inizio }}</td>
@@ -36,6 +37,7 @@
                             indicata</span>{% endif %}</td>
                     <td>{{ foto.intersezione }}</td>
                     <td>{{ foto.latitudine }} {{ foto.longitudine }}</td>
+                    <td><a class="button is-small is-link" href="{{ url_for('edit_fototrappola', codice=foto.codice) }}">Edit</a></td>
                 </tr>
 
                 {% endfor %}

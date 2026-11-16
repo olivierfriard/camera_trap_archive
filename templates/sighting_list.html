@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "fototrappola_coordinates.html" import coordinates, coordinate_scripts %}
 
-{% block title %}Elenco avvistamenti{% endblock %}
+{% block title %}Elenco avvistamenti{% if camtrap_id %} — Fototrappola {{ camtrap_id }}{% endif %}{% endblock %}
 
 {% block head %}
 <style>
@@ -33,9 +33,12 @@
     <div class="container">
 
         <h1 class="title has-text-centered">
-            Elenco avvistamenti
+            Elenco avvistamenti{% if camtrap_id %} — Fototrappola {{ camtrap_id }}{% endif %}
         </h1>
         <p class="subtitle has-text-centered">Avvistamenti caricati da {{ session['fullname'] }}</p>
+        {% if camtrap_id %}
+        <a class="button is-light" href="{{ url_for('elenco_fototrappole') }}">Torna all'elenco fototrappole</a>
+        {% endif %}
 
         <br><br>
 
@@ -82,7 +85,7 @@
             </div>
         </article>
         {% else %}
-        <div class="notification is-info is-light">Nessun avvistamento registrato.</div>
+        <div class="notification is-info is-light">{% if camtrap_id %}Nessun avvistamento registrato per questa fototrappola.{% else %}Nessun avvistamento registrato.{% endif %}</div>
         {% endfor %}
 
     </div>

@@ -1099,10 +1099,18 @@ def save_fototrappola():
 @app.route(APP_ROOT + "/sighting_list")
 @login_required
 def sighting_list():
-    """
-    display sighting list for user
-    """
+    """List the user's sightings, optionally restricted to an owned camera trap."""
+    camtrap_id = request.args.get("camtrap_id")
+    parameters = {"operator": session["username"]}
     with engine.connect() as conn:
+        if camtrap_id is not None:
+            parameters["camtrap_id"] = camtrap_id
+            camera_exists = conn.execute(
+                text("SELECT 1 FROM fototrappole WHERE codice = :camtrap_id AND operator = :operator"),
+                parameters,
+            ).scalar()
+            if camera_exists is None:
+                abort(404)
         query = text("""
             SELECT s.id, s.code, s.timestamp, s.camtrap_id, s.wolf_number,
                    s.scalp,
@@ -1118,9 +1126,10 @@ def sighting_list():
             FROM sighting s JOIN media m ON m.sighting_id = s.id
             LEFT JOIN fototrappole f ON f.codice = s.camtrap_id AND f.operator = s.operator
             WHERE s.operator = :operator
+        """ + (" AND s.camtrap_id = :camtrap_id" if camtrap_id is not None else "") + """
             ORDER BY s.timestamp DESC NULLS LAST, s.id DESC, m.id DESC
         """)
-        rows = conn.execute(query, {"operator": session["username"]}).mappings().all()
+        rows = conn.execute(query, parameters).mappings().all()
     results = []
     for row in rows:
         sighting = dict(row)
@@ -1140,7 +1149,7 @@ def sighting_list():
             else None
         )
         results.append(sighting)
-    return render_template("sighting_list.html", sightings=results)
+    return render_template("sighting_list.html", sightings=results, camtrap_id=camtrap_id)
 
 
 @app.route(APP_ROOT + "/upload_camtrap_video", methods=["POST"])

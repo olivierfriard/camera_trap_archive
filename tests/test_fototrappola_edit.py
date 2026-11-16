@@ -87,6 +87,8 @@ class FototrappolaEditTests(unittest.TestCase):
     def test_list_links_to_prefilled_edit_form(self):
         html = self.client.get(self.main.APP_ROOT + '/elenco_fototrappole').get_data(as_text=True)
         self.assertIn(f'href="{self.path}"', html)
+        self.assertIn('>Edit</a>', html)
+        self.assertIn(f'href="{self.main.APP_ROOT}/sighting_list?camtrap_id=FT01">FT01</a>', html)
         html = self.client.get(self.path).get_data(as_text=True)
         fields = InputParser(html).inputs
         self.assertEqual(fields['codice']['value'], 'FT01')

@@ -119,6 +119,38 @@ class SightingListTests(unittest.TestCase):
         self.assertLess(html.index("NEWEST"), html.index("OLDER"))
         self.assertLess(html.index("OLDER"), html.index("UNDATED"))
 
+    def test_camera_filter_only_lists_owned_camera_sightings(self):
+        self.add_sighting(id=1, code="CAMERA-OLDER", timestamp="2026-01-01T12:00:00+00:00")
+        self.add_sighting(id=2, code="CAMERA-NEWEST")
+        self.add_sighting(id=3, code="OTHER-CAMERA")
+        self.add_sighting(id=4, code="PRIVATE-SIGHTING", operator="someone-else")
+        with self.database.begin() as conn:
+            conn.execute(text("INSERT INTO fototrappole VALUES ('FT02', 'user', 45, 7)"))
+            conn.execute(text("UPDATE sighting SET camtrap_id='FT02' WHERE id=3"))
+        response = self.client.get(self.main.APP_ROOT + "/sighting_list?camtrap_id=FT01&operator=someone-else")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("Fototrappola FT01", html)
+        self.assertIn("Torna all'elenco fototrappole", html)
+        self.assertNotIn("OTHER-CAMERA", html)
+        self.assertNotIn("PRIVATE-SIGHTING", html)
+        self.assertLess(html.index("CAMERA-NEWEST"), html.index("CAMERA-OLDER"))
+        self.assertEqual(html.count("<article"), 2)
+        self.assertIn("OTHER-CAMERA", self.get_list())
+
+    def test_owned_camera_without_sightings_shows_empty_list(self):
+        response = self.client.get(self.main.APP_ROOT + "/sighting_list?camtrap_id=FT01")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Nessun avvistamento registrato per questa fototrappola.", response.get_data(as_text=True))
+
+    def test_camera_filter_rejects_foreign_and_unknown_codes(self):
+        with self.database.begin() as conn:
+            conn.execute(text("INSERT INTO fototrappole VALUES ('PRIVATE', 'someone-else', 45, 7)"))
+        for code in ("PRIVATE", "MISSING", "FT01' OR 1=1 --", ""):
+            with self.subTest(code=code):
+                response = self.client.get(self.main.APP_ROOT + "/sighting_list", query_string={"camtrap_id": code})
+                self.assertEqual(response.status_code, 404)
+
     def test_notes_are_escaped_and_footer_identifies_user(self):
         self.add_sighting(notes="<script>alert('test')</script>\nSeconda riga")
         html = self.get_list()
