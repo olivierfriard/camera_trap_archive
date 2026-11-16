@@ -206,6 +206,8 @@
                 <div class="column is-one-third">
                     <div class="field">
                         <label class="label" for="utmZoneInput">Zona UTM (numero e lettera)</label>
+                        <p class="help" id="utmHelp">La lettera indica la banda di latitudine , non
+                            l'emisfero</p>
                         <div class="control">
                             <input class="input" id="utmZoneInput" name="utm_zone" placeholder="32T" maxlength="3"
                                 aria-describedby="coordinateStatus utmHelp" />
@@ -231,14 +233,11 @@
                     </div>
                 </div>
             </div>
-            <p class="help" id="utmHelp">Coordinate WGS84. La lettera indica la banda di latitudine (es. 32T), non
-                l'emisfero. UTM disponibile da 80° S a 84° N.</p>
+
             <p class="help" id="coordinateStatus" role="status" aria-live="polite"></p>
 
             <p class="help" id="addressStatus" role="status" aria-live="polite"></p>
-            <p class="help">Comune, provincia, regione e paese da <a href="https://www.openstreetmap.org/copyright"
-                    target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a>. Verifica i risultati
-                e correggili se necessario.</p>
+
             <p class="help">Clicca sulla mappa per impostare le coordinate.</p>
             <div id="map" style="height: 400px; border-radius: 8px;"></div>
 

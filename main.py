@@ -71,7 +71,7 @@ class MyFlask(Flask):
         )
 
 
-app = MyFlask(__name__)
+app = MyFlask(__name__, static_url_path=f"{APP_ROOT.rstrip('/')}/static")
 app.secret_key = APP_SECRET_KEY  # cambia in produzione
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["SIGHTING_TIMEZONE"] = config.get("sighting_timezone", "Europe/Rome")
