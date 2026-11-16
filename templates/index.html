@@ -1,91 +1,64 @@
-<!doctype html>
-<html lang="it">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Archivio fototrappole</title>
-        <link
-            rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css"
-        />
-    </head>
-    <body>
-        <main>
-        <section class="section">
-            <div class="container">
-                <div class="columns is-centered">
-                    <div class="column is-4-desktop">
-                        <h1 class="title has-text-centered">
-                            Archivio fototrappole
-                        </h1>
-                        {% with messages = get_flashed_messages(with_categories=true) %}
-                              {% if messages %}
-                                <div id="flashes">
-                                  {% for category, msg in messages %}
-                                    {# Map Flask categories to Bulma notification classes #}
-                                    {% set bulma_class = {
-                                      'success': 'is-success',
-                                      'warning': 'is-warning',
-                                      'info':    'is-info',
-                                      'danger':  'is-danger',
-                                      'error':   'is-danger'
-                                    }[category] if category in ['success','warning','info','danger','error'] else 'is-light' %}
+{% extends "base.html" %}
 
-                                    <div class="notification {{ bulma_class }}">
-                                      <button class="delete" aria-label="dismiss"></button>
-                                      {{ msg }}
-                                    </div>
-                                  {% endfor %}
-                                </div>
-                              {% endif %}
-                            {% endwith %}
-                        <div class="box">
-                            <div class="buttons is-centered">
-                                {% if session.get('is_admin') %}
-                                <a class="button is-link" href="{{ url_for('administration') }}">Amministrazione</a>
-                                {% endif %}
-                                <a
-                                    class="button is-primary is-large"
-                                    href="{{ url_for('nuovo_avvistamento') }}"
-                                    >Nuovo avvistamento</a
-                                >
-                                <a
-                                    class="button is-primary is-large"
-                                    href="{{ url_for('sighting_list') }}"
-                                    >Elenco avistamenti</a
-                                >
+{% block title %}Archivio avistamenti{% endblock %}
 
-                                <a
-                                    class="button is-primary is-large"
-                                    href="{{ url_for('nuova_fototrappola') }}"
-                                    >Nuova fototrappola</a
-                                >
+{% block content %}
+<section>
+    <section class="section">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-4-desktop">
+                    <h1 class="title has-text-centered">
+                        Archivio fototrappole
+                    </h1>
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    <div id="flashes">
+                        {% for category, msg in messages %}
+                        {# Map Flask categories to Bulma notification classes #}
+                        {% set bulma_class = {
+                        'success': 'is-success',
+                        'warning': 'is-warning',
+                        'info': 'is-info',
+                        'danger': 'is-danger',
+                        'error': 'is-danger'
+                        }[category] if category in ['success','warning','info','danger','error'] else 'is-light' %}
 
-                                <a
-                                    class="button is-primary is-large"
-                                    href="{{ url_for('elenco_fototrappole') }}"
-                                    >Elenco fototrappole</a
-                                >
-
-                            </div>
+                        <div class="notification {{ bulma_class }}">
+                            <button class="delete" aria-label="dismiss"></button>
+                            {{ msg }}
                         </div>
-                        <a
-                            class="button is-warning is-small"
-                            href="{{ url_for('logout') }}"
-                            >Logout</a
-                        >
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                    <div class="box">
+                        <div class="buttons is-centered">
+                            {% if session.get('is_admin') %}
+                            <a class="button is-link" href="{{ url_for('administration') }}">Amministrazione</a>
+                            {% endif %}
+                            <a class="button is-primary is-large" href="{{ url_for('nuovo_avvistamento') }}">Nuovo
+                                avvistamento</a>
+                            <a class="button is-primary is-large" href="{{ url_for('sighting_list') }}">Elenco
+                                avistamenti</a>
+
+                            <a class="button is-primary is-large" href="{{ url_for('nuova_fototrappola') }}">Nuova
+                                fototrappola</a>
+
+                            <a class="button is-primary is-large" href="{{ url_for('elenco_fototrappole') }}">Elenco
+                                fototrappole</a>
+
+                        </div>
+                    </div>
 
 
-                </div>
+
                 </div>
             </div>
+        </div>
 
 
 
-        </section>
-        </main>
-
-        {% include "footer.html" %}
-
-    </body>
-</html>
+    </section>
+</section>
+{% endblock %}

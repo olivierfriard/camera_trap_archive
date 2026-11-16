@@ -1,85 +1,94 @@
+{% extends "base.html" %}
 {% from "fototrappola_coordinates.html" import coordinates, coordinate_scripts %}
-<!doctype html>
-<html lang="it">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Elenco avvistamenti</title>
-        <link
-            rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css"
-        />
-        <style>
-            .sighting-media {
-                display: block;
-                width: 100%;
-                max-height: 360px;
-                object-fit: contain;
-                border-radius: 6px;
-            }
-            video.sighting-media { background: #111; }
-            .sighting-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
-            .sighting-code { overflow-wrap: anywhere; }
-        </style>
-    </head>
-    <body>
-        <main class="section">
-            <div class="container">
 
-                        <h1 class="title has-text-centered">
-                            Elenco avvistamenti
-                        </h1>
-                        <p class="subtitle has-text-centered">Avvistamenti caricati da {{ session['fullname'] }}</p>
+{% block title %}Elenco avvistamenti{% endblock %}
 
-                        <a class="button" href="{{ url_for('index') }}">Home</a>
-                        <br><br>
+{% block head %}
+<style>
+    .sighting-media {
+        display: block;
+        width: 100%;
+        max-height: 360px;
+        object-fit: contain;
+        border-radius: 6px;
+    }
 
-                        {% macro detail(label, value) %}
-                        <div class="column is-half">
-                            <dt class="has-text-weight-semibold">{{ label }}</dt>
-                            <dd>{{ value if value is not none and value != '' else 'Non indicato' }}</dd>
-                        </div>
-                        {% endmacro %}
+    video.sighting-media {
+        background: #111;
+    }
 
-                        {% for sighting in sightings %}
-                        <article class="box">
-                            <h2 class="title is-4 sighting-code">{{ sighting.code }}</h2>
-                            <div class="columns">
-                                <div class="column is-half">
-                                    {% if sighting.preview_url %}
-                                    <video class="sighting-media" src="{{ sighting.preview_url }}" controls playsinline preload="none" width="640" {% if sighting.data_uri %}poster="{{ sighting.data_uri }}"{% endif %}>
-                                        Il browser non supporta la riproduzione video.
-                                    </video>
-                                    {% else %}
-                                    {% if sighting.data_uri %}
-                                    <img class="sighting-media" src="{{ sighting.data_uri }}" alt="Immagine dell'avvistamento {{ sighting.code }}" loading="lazy" />
-                                    {% else %}
-                                    <p class="notification is-light">Immagine non disponibile.</p>
-                                    {% endif %}
-                                    <p class="help has-text-warning-dark mt-2">Anteprima video non disponibile.</p>
-                                    {% endif %}
-                                </div>
-                                <div class="column is-half">
-                                    <dl class="columns is-multiline is-mobile">
-                                        {{ detail('Data e ora', sighting.date_time) }}
-                                        {{ detail('ID fototrappola', sighting.camtrap_id) }}
-                                        {{ detail('Numero di lupi', sighting.wolf_number) }}
-                                        {{ detail('SCALP', sighting.scalp) }}
-                                    </dl>
-                                    {{ coordinates(sighting.latitude, sighting.longitude, sighting.coordinate_source) }}
-                                    <p class="has-text-weight-semibold">Note</p>
-                                    <p class="sighting-notes mb-4">{{ sighting.notes if sighting.notes else 'Nessuna nota.' }}</p>
-                                    <a class="button is-link is-small" href="{{ url_for('view', sighting_id=sighting.id) }}">Apri scheda</a>
-                                </div>
-                            </div>
-                        </article>
-                        {% else %}
-                        <div class="notification is-info is-light">Nessun avvistamento registrato.</div>
-                        {% endfor %}
+    .sighting-notes {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
 
+    .sighting-code {
+        overflow-wrap: anywhere;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="container">
+
+        <h1 class="title has-text-centered">
+            Elenco avvistamenti
+        </h1>
+        <p class="subtitle has-text-centered">Avvistamenti caricati da {{ session['fullname'] }}</p>
+
+        <br><br>
+
+        {% macro detail(label, value) %}
+        <div class="column is-half">
+            <dt class="has-text-weight-semibold">{{ label }}</dt>
+            <dd>{{ value if value is not none and value != '' else 'Non indicato' }}</dd>
+        </div>
+        {% endmacro %}
+
+        {% for sighting in sightings %}
+        <article class="box">
+            <h2 class="title is-4 sighting-code">{{ sighting.code }}</h2>
+            <div class="columns">
+                <div class="column is-half">
+                    {% if sighting.preview_url %}
+                    <video class="sighting-media" src="{{ sighting.preview_url }}" controls playsinline preload="none"
+                        width="640" {% if sighting.data_uri %}poster="{{ sighting.data_uri }}" {% endif %}>
+                        Il browser non supporta la riproduzione video.
+                    </video>
+                    {% else %}
+                    {% if sighting.data_uri %}
+                    <img class="sighting-media" src="{{ sighting.data_uri }}"
+                        alt="Immagine dell'avvistamento {{ sighting.code }}" loading="lazy" />
+                    {% else %}
+                    <p class="notification is-light">Immagine non disponibile.</p>
+                    {% endif %}
+                    <p class="help has-text-warning-dark mt-2">Anteprima video non disponibile.</p>
+                    {% endif %}
+                </div>
+                <div class="column is-half">
+                    <dl class="columns is-multiline is-mobile">
+                        {{ detail('Data e ora', sighting.date_time) }}
+                        {{ detail('ID fototrappola', sighting.camtrap_id) }}
+                        {{ detail('Numero di lupi', sighting.wolf_number) }}
+                        {{ detail('SCALP', sighting.scalp) }}
+                    </dl>
+                    {{ coordinates(sighting.latitude, sighting.longitude, sighting.coordinate_source) }}
+                    <p class="has-text-weight-semibold">Note</p>
+                    <p class="sighting-notes mb-4">{{ sighting.notes if sighting.notes else 'Nessuna nota.' }}</p>
+                    <a class="button is-link is-small" href="{{ url_for('view', sighting_id=sighting.id) }}">Apri
+                        scheda</a>
+                </div>
             </div>
-        </main>
-        {% include "footer.html" %}
-        {{ coordinate_scripts() }}
-    </body>
-</html>
+        </article>
+        {% else %}
+        <div class="notification is-info is-light">Nessun avvistamento registrato.</div>
+        {% endfor %}
+
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{{ coordinate_scripts() }}
+{% endblock %}

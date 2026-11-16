@@ -1,267 +1,262 @@
-<!doctype html>
-<html lang="it">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Nuova fototrappola</title>
+{% block title %}Nuova fototrappola{% endblock %}
 
-    <!-- Bulma CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css" />
+{% block head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<style>
+    #map {
+        height: 400px;
+        width: 100%;
+        border-radius: 8px;
+    }
 
-    <style>
-        #map {
-            height: 400px;
-            width: 100%;
-            border-radius: 8px;
-        }
+    video {
+        max-width: 100%;
+        margin-top: 1rem;
+        border-radius: 8px;
+    }
+</style>
+{% endblock %}
 
-        video {
-            max-width: 100%;
-            margin-top: 1rem;
-            border-radius: 8px;
-        }
-    </style>
-</head>
+{% block content %}
+<section class="section">
+    <div class="container">
+        <h1 class="title is-3">Nuova fototrappola</h1>
 
-<body>
-    <section class="section">
-        <div class="container">
-            <h1 class="title is-3">Nuova fototrappola</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div id="flashes">
+            {% for category, msg in messages %}
+            {# Map Flask categories to Bulma notification classes #}
+            {% set bulma_class = {
+            'success': 'is-success',
+            'warning': 'is-warning',
+            'info': 'is-info',
+            'danger': 'is-danger',
+            'error': 'is-danger'
+            }[category] if category in ['success','warning','info','danger','error'] else 'is-light' %}
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            <div id="flashes">
-                {% for category, msg in messages %}
-                {# Map Flask categories to Bulma notification classes #}
-                {% set bulma_class = {
-                'success': 'is-success',
-                'warning': 'is-warning',
-                'info': 'is-info',
-                'danger': 'is-danger',
-                'error': 'is-danger'
-                }[category] if category in ['success','warning','info','danger','error'] else 'is-light' %}
-
-                <div class="notification {{ bulma_class }}">
-                    <button class="delete" aria-label="dismiss"></button>
-                    {{ msg }}
-                </div>
-                {% endfor %}
+            <div class="notification {{ bulma_class }}">
+                <button class="delete" aria-label="dismiss"></button>
+                {{ msg }}
             </div>
-            {% endif %}
-            {% endwith %}
-
-            <form method="post" action="{{ url_for('save_fototrappola') }}">
-
-                <div class="columns is-multiline">
-                    <div class="column is-one-third">
-                        <div class="field">
-                            <label class="label">Codice</label>
-                            <div class="control">
-                                <input class="input" name="codice" required />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="column is-one-third">
-                        <div class="field">
-                            <label class="label">Tipo</label>
-                            <div class="control">
-                                <input class="input" name="tipo" required />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="column is-one-third">
-                        <div class="field">
-                            <label class="label">Intersezioni</label>
-                            <div class="control">
-                                <input class="input" name="intersezioni" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="columns is-multiline">
-                    <div class="column is-one-quarter">
-                        <div class="field">
-                            <label class="label">Data Inizio</label>
-                            <div class="control">
-                                <input class="input" type="date" name="data_inizio" required />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="column is-one-quarter">
-                        <div class="field">
-                            <label class="label">Data Fine</label>
-                            <div class="control">
-                                <input class="input" type="date" name="data_fine" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="column is-one-quarter">
-                        <div class="field">
-                            <label class="label">Nome</label>
-                            <div class="control">
-                                <input class="input" name="nome" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="column is-one-quarter">
-                        <div class="field">
-                            <label class="label">Cognome</label>
-                            <div class="control">
-                                <input class="input" name="cognome" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="columns is-multiline">
-
-                    <div class="column is-one-quarter">
-                        <div class="field">
-                            <label class="label" for="location">Località</label>
-                            <div class="control">
-                                <input class="input" id="location" name="location" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="column is-one-quarter">
-                        <div class="field">
-                            <label class="label">Comune</label>
-                            <div class="control">
-                                <input class="input" name="comune" required />
-                            </div>
-                        </div>
-                    </div>
-
-
-                    <div class="column is-one-quarter">
-                        <div class="field">
-                            <label class="label">Provincia</label>
-                            <div class="control">
-                                <input class="input" name="provincia" required />
-                            </div>
-                        </div>
-                    </div>
-
-
-
-
-                    <div class="column is-one-quarter">
-                        <div class="field">
-                            <label class="label">Regione</label>
-                            <div class="control">
-                                <input class="input" name="regione" required />
-                            </div>
-                        </div>
-                    </div>
-
-
-                </div>
-
-                <div class="field">
-                    <label class="label">Paese (default: Italia)</label>
-                    <div class="control">
-                        <input class="input" name="country" value="Italia" />
-                    </div>
-                </div>
-
-
-                <div class="columns is-multiline">
-                    <div class="column is-one-third">
-                        <div class="field">
-                            <label class="label">Latitudine</label>
-                            <div class="control">
-                                <input class="input" id="latInput" name="latitudine" required />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="column is-one-third">
-                        <div class="field">
-                            <label class="label">Longitudine</label>
-                            <div class="control">
-                                <input class="input" id="lngInput" name="longitudine" required />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="column is-one-third">
-                        <div class="field">
-                            <label class="label">Altitudine</label>
-                            <div class="control">
-                                <input class="input" id="altInput" type="number" step="1" name="altitudine"
-                                    aria-describedby="altitudeStatus altitudeSource" />
-                            </div>
-                            <p class="help" id="altitudeStatus" role="status" aria-live="polite"></p>
-                            <p class="help" id="altitudeSource">Stima in metri da <a
-                                    href="https://open-meteo.com/en/docs/elevation-api" target="_blank"
-                                    rel="noopener noreferrer">Open-Meteo</a> / <a
-                                    href="https://doi.org/10.5270/ESA-c5d3d65" target="_blank"
-                                    rel="noopener noreferrer">Copernicus DEM</a>. Modificabile manualmente.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="columns is-multiline">
-                    <div class="column is-one-third">
-                        <div class="field">
-                            <label class="label" for="utmZoneInput">Zona UTM (numero e lettera)</label>
-                            <div class="control">
-                                <input class="input" id="utmZoneInput" name="utm_zone" placeholder="32T" maxlength="3" aria-describedby="coordinateStatus utmHelp" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="column is-one-third">
-                        <div class="field">
-                            <label class="label" for="utmEastInput">Est UTM (m)</label>
-                            <div class="control">
-                                <input class="input" id="utmEastInput" name="utm_easting" type="number" step="any" aria-describedby="coordinateStatus utmHelp" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="column is-one-third">
-                        <div class="field">
-                            <label class="label" for="utmNorthInput">Nord UTM (m)</label>
-                            <div class="control">
-                                <input class="input" id="utmNorthInput" name="utm_northing" type="number" step="any" aria-describedby="coordinateStatus utmHelp" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <p class="help" id="utmHelp">Coordinate WGS84. La lettera indica la banda di latitudine (es. 32T), non l'emisfero. UTM disponibile da 80° S a 84° N.</p>
-                <p class="help" id="coordinateStatus" role="status" aria-live="polite"></p>
-
-                <p class="help" id="addressStatus" role="status" aria-live="polite"></p>
-                <p class="help">Comune, provincia, regione e paese da <a href="https://www.openstreetmap.org/copyright"
-                        target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a>. Verifica i risultati
-                    e correggili se necessario.</p>
-                <p class="help">Clicca sulla mappa per impostare le coordinate.</p>
-                <div id="map" style="height: 400px; border-radius: 8px;"></div>
-
-                <br />
-
-
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button class="button is-primary" type="submit">Salva</button>
-                    </div>
-                </div>
-
-            </form>
+            {% endfor %}
         </div>
-    </section>
-</body>
+        {% endif %}
+        {% endwith %}
 
+        <form method="post" action="{{ url_for('save_fototrappola') }}">
+
+            <div class="columns is-multiline">
+                <div class="column is-one-third">
+                    <div class="field">
+                        <label class="label">Codice</label>
+                        <div class="control">
+                            <input class="input" name="codice" required />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-one-third">
+                    <div class="field">
+                        <label class="label">Tipo</label>
+                        <div class="control">
+                            <input class="input" name="tipo" required />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-one-third">
+                    <div class="field">
+                        <label class="label">Intersezioni</label>
+                        <div class="control">
+                            <input class="input" name="intersezioni" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="columns is-multiline">
+                <div class="column is-one-quarter">
+                    <div class="field">
+                        <label class="label">Data Inizio</label>
+                        <div class="control">
+                            <input class="input" type="date" name="data_inizio" required />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-one-quarter">
+                    <div class="field">
+                        <label class="label">Data Fine</label>
+                        <div class="control">
+                            <input class="input" type="date" name="data_fine" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-one-quarter">
+                    <div class="field">
+                        <label class="label">Nome</label>
+                        <div class="control">
+                            <input class="input" name="nome" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-one-quarter">
+                    <div class="field">
+                        <label class="label">Cognome</label>
+                        <div class="control">
+                            <input class="input" name="cognome" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="columns is-multiline">
+
+                <div class="column is-one-quarter">
+                    <div class="field">
+                        <label class="label" for="location">Località</label>
+                        <div class="control">
+                            <input class="input" id="location" name="location" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-one-quarter">
+                    <div class="field">
+                        <label class="label">Comune</label>
+                        <div class="control">
+                            <input class="input" name="comune" required />
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="column is-one-quarter">
+                    <div class="field">
+                        <label class="label">Provincia</label>
+                        <div class="control">
+                            <input class="input" name="provincia" required />
+                        </div>
+                    </div>
+                </div>
+
+
+
+
+                <div class="column is-one-quarter">
+                    <div class="field">
+                        <label class="label">Regione</label>
+                        <div class="control">
+                            <input class="input" name="regione" required />
+                        </div>
+                    </div>
+                </div>
+
+
+            </div>
+
+            <div class="field">
+                <label class="label">Paese (default: Italia)</label>
+                <div class="control">
+                    <input class="input" name="country" value="Italia" />
+                </div>
+            </div>
+
+
+            <div class="columns is-multiline">
+                <div class="column is-one-third">
+                    <div class="field">
+                        <label class="label">Latitudine</label>
+                        <div class="control">
+                            <input class="input" id="latInput" name="latitudine" required />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-one-third">
+                    <div class="field">
+                        <label class="label">Longitudine</label>
+                        <div class="control">
+                            <input class="input" id="lngInput" name="longitudine" required />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-one-third">
+                    <div class="field">
+                        <label class="label">Altitudine</label>
+                        <div class="control">
+                            <input class="input" id="altInput" type="number" step="1" name="altitudine"
+                                aria-describedby="altitudeStatus altitudeSource" />
+                        </div>
+                        <p class="help" id="altitudeStatus" role="status" aria-live="polite"></p>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="columns is-multiline">
+                <div class="column is-one-third">
+                    <div class="field">
+                        <label class="label" for="utmZoneInput">Zona UTM (numero e lettera)</label>
+                        <div class="control">
+                            <input class="input" id="utmZoneInput" name="utm_zone" placeholder="32T" maxlength="3"
+                                aria-describedby="coordinateStatus utmHelp" />
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-one-third">
+                    <div class="field">
+                        <label class="label" for="utmEastInput">Est UTM (m)</label>
+                        <div class="control">
+                            <input class="input" id="utmEastInput" name="utm_easting" type="number" step="any"
+                                aria-describedby="coordinateStatus utmHelp" />
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-one-third">
+                    <div class="field">
+                        <label class="label" for="utmNorthInput">Nord UTM (m)</label>
+                        <div class="control">
+                            <input class="input" id="utmNorthInput" name="utm_northing" type="number" step="any"
+                                aria-describedby="coordinateStatus utmHelp" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="help" id="utmHelp">Coordinate WGS84. La lettera indica la banda di latitudine (es. 32T), non
+                l'emisfero. UTM disponibile da 80° S a 84° N.</p>
+            <p class="help" id="coordinateStatus" role="status" aria-live="polite"></p>
+
+            <p class="help" id="addressStatus" role="status" aria-live="polite"></p>
+            <p class="help">Comune, provincia, regione e paese da <a href="https://www.openstreetmap.org/copyright"
+                    target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a>. Verifica i risultati
+                e correggili se necessario.</p>
+            <p class="help">Clicca sulla mappa per impostare le coordinate.</p>
+            <div id="map" style="height: 400px; border-radius: 8px;"></div>
+
+            <br />
+
+
+            <div class="field is-grouped">
+                <div class="control">
+                    <button class="button is-primary" type="submit">Salva</button>
+                </div>
+            </div>
+
+        </form>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.22.0/dist/proj4.js" crossorigin="anonymous"></script>
 <script src="{{ url_for('static', filename='js/utm-coordinates.js') }}"></script>
@@ -284,7 +279,7 @@
     const coordinateStatus = document.getElementById("coordinateStatus");
     const utmFields = [utmZoneInput, utmEastInput, utmNorthInput];
     const utmAvailable = typeof proj4 === "function" && typeof CameraTrapUtm !== "undefined";
-    if (!utmAvailable) utmFields.forEach(field => { field.disabled = true; });
+    if (!utmAvailable) utmFields.forEach(field => {field.disabled = true;});
     let elevationTimer = null;
     let elevationController = null;
     let elevationVersion = 0;
@@ -445,7 +440,7 @@
     }
 
     function syncFromGeographic() {
-        utmFields.forEach(field => { field.setCustomValidity(""); field.value = ""; });
+        utmFields.forEach(field => {field.setCustomValidity(""); field.value = "";});
         latInput.setCustomValidity("");
         lngInput.setCustomValidity("");
         coordinateStatus.textContent = utmAvailable ? "" : "Conversione UTM non disponibile. Usa latitudine e longitudine.";
@@ -518,5 +513,4 @@
     map.on("click", e => setCoords(e.latlng.lat, e.latlng.lng));
     syncFromGeographic();
 </script>
-
-</html>
+{% endblock %}

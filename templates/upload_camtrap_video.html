@@ -1,17 +1,9 @@
-<!doctype html>
-<html lang="it">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <title>Avistamento fototrappola</title>
+{% extends "base.html" %}
 
-        <!-- Bulma CSS -->
-        <link
-            rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css"
-        />
+{% block title %}Avistamento fototrappola{% endblock %}
 
-        <!-- Leaflet CSS -->
+{% block head %}
+<!-- Leaflet CSS -->
         <link
             rel="stylesheet"
             href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -30,9 +22,10 @@
                 border-radius: 8px;
             }
         </style>
-    </head>
-    <body>
-        <section class="section">
+{% endblock %}
+
+{% block content %}
+<section class="section">
             <div class="container">
                 <h1 class="title is-3">Nuovo avistamento fototrappola</h1>
 
@@ -101,15 +94,13 @@
                     </div>
                 </form>
                 <br /><br />
-                <a
-                    class="button is-warning is-small"
-                    href="{{ url_for('logout') }}"
-                    >Logout</a
-                >
+
             </div>
         </section>
+{% endblock %}
 
-        <script
+{% block scripts %}
+<script
             src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             crossorigin=""
         ></script>
@@ -145,5 +136,4 @@
                 setPosition(lat, lng);
             });
         </script>
-    </body>
-</html>
+{% endblock %}

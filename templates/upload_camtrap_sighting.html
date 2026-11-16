@@ -1,14 +1,9 @@
-<!doctype html>
-<html lang="it">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Avistamento fototrappola</title>
+{% block title %}Avistamento fototrappola{% endblock %}
 
-    <!-- Bulma CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
     <style>
         #map {
@@ -26,11 +21,10 @@
 
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+{% endblock %}
 
-</head>
-
-<body>
-    <section class="section">
+{% block content %}
+<section class="section">
         <div class="container">
             <h1 class="title is-3">Avistamento fototrappola</h1>
 
@@ -194,14 +188,11 @@
 
         </div>
     </section>
+{% endblock %}
 
-
-
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/proj4@2.22.0/dist/proj4.js" crossorigin="anonymous"></script>
     <script src="{{ url_for('static', filename='js/utm-coordinates.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sighting-coordinates.js') }}"></script>
-</body>
-
-</html>
+{% endblock %}

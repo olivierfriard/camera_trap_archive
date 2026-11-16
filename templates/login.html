@@ -1,16 +1,9 @@
-<!doctype html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Login</title>
-        <link
-            rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css"
-        />
-    </head>
-    <body>
-        <section class="section">
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<section class="section">
             <div class="container">
                 <div class="columns is-centered">
                     <div class="column is-4-desktop">
@@ -78,12 +71,9 @@
                                 </div>
                             </form>
                         </div>
-                        <p class="has-text-centered">
-                            &copy; {{ current_year }} Università di Torino
-                        </p>
+
                     </div>
                 </div>
             </div>
         </section>
-    </body>
-</html>
+{% endblock %}
