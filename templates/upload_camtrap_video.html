@@ -4,136 +4,115 @@
 
 {% block head %}
 <!-- Leaflet CSS -->
-        <link
-            rel="stylesheet"
-            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-            crossorigin=""
-        />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
-        <style>
-            #map {
-                height: 400px;
-                width: 100%;
-                border-radius: 8px;
-            }
-            video {
-                max-width: 100%;
-                margin-top: 1rem;
-                border-radius: 8px;
-            }
-        </style>
+<style>
+    #map {
+        height: 400px;
+        width: 100%;
+        border-radius: 8px;
+    }
+
+    video {
+        max-width: 100%;
+        margin-top: 1rem;
+        border-radius: 8px;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
 <section class="section">
-            <div class="container">
-                <h1 class="title is-3">Nuovo avistamento fototrappola</h1>
+    <div class="container">
+        <h1 class="title is-3">Nuovo avistamento da fototrappola</h1>
 
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                <div id="flashes">
-                    {% for category, msg in messages %} {# Map Flask categories
-                    to Bulma notification classes #} {% set bulma_class = {
-                    'success': 'is-success', 'warning': 'is-warning', 'info':
-                    'is-info', 'danger': 'is-danger', 'error': 'is-danger'
-                    }[category] if category in
-                    ['success','warning','info','danger','error'] else
-                    'is-light' %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div id="flashes">
+            {% for category, msg in messages %} {# Map Flask categories
+            to Bulma notification classes #} {% set bulma_class = {
+            'success': 'is-success', 'warning': 'is-warning', 'info':
+            'is-info', 'danger': 'is-danger', 'error': 'is-danger'
+            }[category] if category in
+            ['success','warning','info','danger','error'] else
+            'is-light' %}
 
-                    <div class="notification {{ bulma_class }}">
-                        <button class="delete" aria-label="dismiss"></button>
-                        {{ msg }}
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %} {% endwith %}
-                <a class="button" href="{{ url_for('index') }}">Home</a>
-                <br /><br />
-                <form
-                    id="uploadForm"
-                    method="post"
-                    action="{{ url_for('upload_camtrap_video') }}"
-                    enctype="multipart/form-data"
-                >
-                    <div class="field">
-                        <label class="label">Video</label>
-                        <div class="file has-name is-fullwidth">
-                            <label class="file-label">
-                                <input
-                                    class="file-input"
-                                    type="file"
-                                    name="video"
-                                    accept="video/*"
-                                    required
-                                    onchange="
+            <div class="notification {{ bulma_class }}">
+                <button class="delete" aria-label="dismiss"></button>
+                {{ msg }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %} {% endwith %}
+        <a class="button" href="{{ url_for('index') }}">Home</a>
+        <br /><br />
+        <form id="uploadForm" method="post" action="{{ url_for('upload_camtrap_video') }}"
+            enctype="multipart/form-data">
+            <div class="field">
+                <label class="label">Video</label>
+                <div class="file has-name is-fullwidth">
+                    <label class="file-label">
+                        <input class="file-input" type="file" name="video" accept="video/*" required onchange="
                                         document.getElementById(
                                             'file-name',
                                         ).textContent =
                                             this.files[0]?.name || ''
-                                    "
-                                />
-                                <span class="file-cta">
-                                    <span class="file-icon"> 📹 </span>
-                                    <span class="file-label"
-                                        >Scegli un video…</span
-                                    >
-                                </span>
-                                <span id="file-name" class="file-name"
-                                    >Nessun file selezionato</span
-                                >
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="field is-grouped">
-                        <div class="control">
-                            <button class="button is-primary" type="submit">
-                                Carica
-                            </button>
-                        </div>
-                    </div>
-                </form>
-                <br /><br />
-
+                                    " />
+                        <span class="file-cta">
+                            <span class="file-icon"> 📹 </span>
+                            <span class="file-label">Scegli un video…</span>
+                        </span>
+                        <span id="file-name" class="file-name">Nessun file selezionato</span>
+                    </label>
+                </div>
             </div>
-        </section>
+
+            <div class="field is-grouped">
+                <div class="control">
+                    <button class="button is-primary" type="submit">
+                        Carica
+                    </button>
+                </div>
+            </div>
+        </form>
+        <br /><br />
+
+    </div>
+</section>
 {% endblock %}
 
 {% block scripts %}
-<script
-            src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            crossorigin=""
-        ></script>
-        <script>
-            const map = L.map("map").setView([45.065, 7.68], 13);
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                maxZoom: 19,
-                attribution: "© OpenStreetMap",
-            }).addTo(map);
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+    const map = L.map("map").setView([45.065, 7.68], 13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap",
+    }).addTo(map);
 
-            let marker = null;
+    let marker = null;
 
-            function setPosition(lat, lng) {
-                document.getElementById("latDisplay").value = lat.toFixed(6);
-                document.getElementById("lngDisplay").value = lng.toFixed(6);
-                document.getElementById("lat").value = lat;
-                document.getElementById("lng").value = lng;
-            }
+    function setPosition(lat, lng) {
+        document.getElementById("latDisplay").value = lat.toFixed(6);
+        document.getElementById("lngDisplay").value = lng.toFixed(6);
+        document.getElementById("lat").value = lat;
+        document.getElementById("lng").value = lng;
+    }
 
-            map.on("click", (e) => {
-                const { lat, lng } = e.latlng;
-                if (!marker) {
-                    marker = L.marker([lat, lng], { draggable: true }).addTo(
-                        map,
-                    );
-                    marker.on("dragend", (ev) => {
-                        const p = ev.target.getLatLng();
-                        setPosition(p.lat, p.lng);
-                    });
-                } else {
-                    marker.setLatLng([lat, lng]);
-                }
-                setPosition(lat, lng);
+    map.on("click", (e) => {
+        const {lat, lng} = e.latlng;
+        if (!marker) {
+            marker = L.marker([lat, lng], {draggable: true}).addTo(
+                map,
+            );
+            marker.on("dragend", (ev) => {
+                const p = ev.target.getLatLng();
+                setPosition(p.lat, p.lng);
             });
-        </script>
+        } else {
+            marker.setLatLng([lat, lng]);
+        }
+        setPosition(lat, lng);
+    });
+</script>
 {% endblock %}

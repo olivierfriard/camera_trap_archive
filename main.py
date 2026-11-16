@@ -473,7 +473,9 @@ def video_preview_url(filename, create=False):
 
 
 def start_conversion_worker():
-    """Start an independent worker; a database advisory lock prevents duplicates."""
+    """
+    Start an independent worker; a database advisory lock prevents duplicates.
+    """
     try:
         log_file = Path(app.instance_path) / "video-conversion.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -503,9 +505,11 @@ def video_conversion_status(filename):
             conn.execute(
                 text("""
             SELECT v.status, v.output_filename, t.status AS transfer_status,
+                   d.status AS restore_status,
                    EXISTS (SELECT 1 FROM media m WHERE m.new_file_name = v.source_filename) AS saved
             FROM video_conversions v
             LEFT JOIN archive_transfers t ON t.source_filename = v.source_filename
+            LEFT JOIN archive_downloads d ON d.source_filename = v.source_filename
             WHERE v.source_filename = :filename AND v.operator = :operator
         """),
                 {"filename": filename, "operator": session["username"]},
@@ -515,14 +519,62 @@ def video_conversion_status(filename):
         )
     if job is None:
         abort(404)
+    if "archive_restore_csrf_token" not in session:
+        session["archive_restore_csrf_token"] = secrets.token_urlsafe(32)
+    download_available = (
+        job["status"] == "completed" and bool(job["output_filename"])
+        and (Path(app.config["UPLOAD_FOLDER"]) / job["output_filename"]).is_file()
+    )
     return jsonify(
         status=job["status"],
         transfer_status=job.get("transfer_status"),
         saved=bool(job.get("saved")),
+        restore_status=job.get("restore_status"),
+        restore_url=url_for("restore_archive_video", filename=filename)
+        if not download_available and job["status"] == "completed"
+        and job.get("transfer_status") == "completed" and job.get("saved")
+        else None,
+        restore_csrf_token=session["archive_restore_csrf_token"],
         download_url=url_for("uploaded_file", filename=job["output_filename"])
-        if job["status"] == "completed"
+        if download_available
         else None,
     )
+
+
+@app.route(APP_ROOT + "/restore_archive_video/<filename>", methods=["POST"])
+@login_required
+def restore_archive_video(filename):
+    """Queue recovery of the current user's saved and verified archive MP4."""
+    token = session.get("archive_restore_csrf_token")
+    if not token or not secrets.compare_digest(
+        token.encode(), request.headers.get("X-CSRF-Token", "").encode()
+    ):
+        abort(400)
+    from archive_download import enqueue_download
+
+    with engine.begin() as conn:
+        job = conn.execute(text("""
+            SELECT t.output_filename
+            FROM video_conversions v
+            JOIN archive_transfers t ON t.source_filename = v.source_filename
+            WHERE v.source_filename = :filename AND v.operator = :operator
+                AND v.status = 'completed' AND t.status = 'completed'
+                AND t.output_filename = v.output_filename AND t.output_md5 = v.output_md5
+                AND EXISTS (
+                    SELECT 1 FROM media m JOIN sighting s ON s.id = m.sighting_id
+                    WHERE m.new_file_name = v.source_filename AND s.operator = v.operator
+                )
+        """), {"filename": filename, "operator": session["username"]}).mappings().fetchone()
+        if job is None:
+            abort(404)
+        output_filename = job["output_filename"]
+        if Path(output_filename).name != output_filename or not output_filename.endswith(".compressed.mp4"):
+            abort(400)
+        if (Path(app.config["UPLOAD_FOLDER"]) / output_filename).is_file():
+            return jsonify(status="completed")
+        enqueue_download(conn, filename)
+    start_conversion_worker()
+    return jsonify(status="pending"), 202
 
 
 def extract_frame(video_path, time_sec):
@@ -565,7 +617,9 @@ def get_fototrappola_data():
     with engine.connect() as conn:
         fototrappola = (
             conn.execute(
-                text("SELECT * FROM fototrappole WHERE codice = :codice AND operator = :operator"),
+                text(
+                    "SELECT * FROM fototrappole WHERE codice = :codice AND operator = :operator"
+                ),
                 {"codice": camtrap_id, "operator": session["username"]},
             )
             .mappings()
@@ -584,6 +638,115 @@ def nuova_fototrappola():
     """
     if request.method == "GET":
         return render_template("nuova_fototrappola.html")
+
+
+@app.route(APP_ROOT + "/fototrappola/<path:codice>", methods=["GET", "POST"])
+@login_required
+def edit_fototrappola(codice):
+    """Edit a camera trap owned by the current user without changing its code."""
+    identity = {"codice": codice, "operator": session["username"]}
+    with engine.connect() as conn:
+        camera = (
+            conn.execute(
+                text(
+                    "SELECT * FROM fototrappole WHERE codice = :codice AND operator = :operator"
+                ),
+                identity,
+            )
+            .mappings()
+            .fetchone()
+        )
+    if camera is None:
+        abort(404)
+
+    if "fototrappola_csrf_token" not in session:
+        session["fototrappola_csrf_token"] = secrets.token_urlsafe(32)
+    values = dict(camera)
+    if request.method == "POST":
+        if not secrets.compare_digest(
+            request.form.get("csrf_token", "").encode(),
+            session["fototrappola_csrf_token"].encode(),
+        ):
+            abort(400)
+        fields = (
+            "tipo",
+            "data_inizio",
+            "data_fine",
+            "nome",
+            "cognome",
+            "regione",
+            "provincia",
+            "comune",
+            "location",
+            "country",
+            "latitudine",
+            "longitudine",
+            "altitudine",
+            "intersezioni",
+        )
+        submitted = {field: request.form.get(field, "").strip() for field in fields}
+        values.update(submitted)
+        try:
+            if not submitted["tipo"] or not submitted["data_inizio"]:
+                raise ValueError("Tipo e data inizio sono obbligatori.")
+            parameters = dict(submitted, **identity)
+            for field in ("data_inizio", "data_fine"):
+                parameters[field] = (
+                    datetime.strptime(submitted[field], "%Y-%m-%d").date()
+                    if submitted[field]
+                    else None
+                )
+            for field, limit in (("latitudine", 90), ("longitudine", 180)):
+                parameters[field] = float(submitted[field])
+                if (
+                    not math.isfinite(parameters[field])
+                    or abs(parameters[field]) > limit
+                ):
+                    raise ValueError("Coordinate non valide.")
+            parameters["altitudine"] = (
+                float(submitted["altitudine"]) if submitted["altitudine"] else None
+            )
+            if parameters["altitudine"] is not None and not math.isfinite(
+                parameters["altitudine"]
+            ):
+                raise ValueError("Altitudine non valida.")
+            parameters["location"] = submitted["location"] or None
+        except (ValueError, OverflowError):
+            flash(
+                "Verifica i campi obbligatori, le date e le coordinate inserite.",
+                "error",
+            )
+            return render_template(
+                "nuova_fototrappola.html", is_edit=True, form_values=values
+            ), 400
+
+        try:
+            with engine.begin() as conn:
+                result = conn.execute(
+                    text("""
+                    UPDATE fototrappole SET
+                        tipo = :tipo, data_inizio = :data_inizio, data_fine = :data_fine,
+                        nome = :nome, cognome = :cognome, regione = :regione,
+                        provincia = :provincia, comune = :comune, location = :location,
+                        country = :country, latitudine = :latitudine,
+                        longitudine = :longitudine, altitudine = :altitudine,
+                        intersezioni = :intersezioni
+                    WHERE codice = :codice AND operator = :operator
+                """),
+                    parameters,
+                )
+        except Exception:
+            app.logger.exception("Failed to update camera trap")
+            flash("Errore durante il salvataggio della fototrappola.", "error")
+            return render_template(
+                "nuova_fototrappola.html", is_edit=True, form_values=values
+            ), 500
+        if result.rowcount == 0:
+            abort(404)
+        flash("Fototrappola aggiornata con successo!", "success")
+        return redirect(url_for("elenco_fototrappole"))
+
+    return render_template("nuova_fototrappola.html", is_edit=True, form_values=values)
 
 
 @app.route(APP_ROOT + "/reverse_geocode", methods=["GET"])
@@ -670,24 +833,34 @@ def save_sighting():
     with engine.connect() as conn:
         fototrappola = None
         if camtrap_id:
-            fototrappola = conn.execute(
-                text("SELECT * FROM fototrappole WHERE codice = :codice AND operator = :operator"),
-                {"codice": camtrap_id, "operator": session["username"]},
-            ).mappings().fetchone()
+            fototrappola = (
+                conn.execute(
+                    text(
+                        "SELECT * FROM fototrappole WHERE codice = :codice AND operator = :operator"
+                    ),
+                    {"codice": camtrap_id, "operator": session["username"]},
+                )
+                .mappings()
+                .fetchone()
+            )
         invalid_camera = bool(camtrap_id) and fototrappola is None
         if not coordinates_submitted and fototrappola is not None:
             latitude = fototrappola["latitudine"]
             longitude = fototrappola["longitudine"]
         invalid_coordinates = False
         coordinate_values = (latitude, longitude)
-        if all(value is None or str(value).strip() == "" for value in coordinate_values):
+        if all(
+            value is None or str(value).strip() == "" for value in coordinate_values
+        ):
             latitude = longitude = None
         else:
             try:
                 parsed_latitude, parsed_longitude = map(float, coordinate_values)
                 if not (
-                    math.isfinite(parsed_latitude) and math.isfinite(parsed_longitude)
-                    and -90 <= parsed_latitude <= 90 and -180 <= parsed_longitude <= 180
+                    math.isfinite(parsed_latitude)
+                    and math.isfinite(parsed_longitude)
+                    and -90 <= parsed_latitude <= 90
+                    and -180 <= parsed_longitude <= 180
                 ):
                     raise ValueError("Invalid sighting coordinates")
                 latitude, longitude = parsed_latitude, parsed_longitude
@@ -711,9 +884,15 @@ def save_sighting():
                     "danger",
                 )
             if invalid_coordinates:
-                flash("Coordinate non valide. Compila entrambe le coordinate, con latitudine tra -90 e 90 e longitudine tra -180 e 180, oppure lascia entrambe vuote.", "danger")
+                flash(
+                    "Coordinate non valide. Compila entrambe le coordinate, con latitudine tra -90 e 90 e longitudine tra -180 e 180, oppure lascia entrambe vuote.",
+                    "danger",
+                )
             if invalid_camera:
-                flash("La fototrappola selezionata non è disponibile per il tuo utente.", "danger")
+                flash(
+                    "La fototrappola selezionata non è disponibile per il tuo utente.",
+                    "danger",
+                )
 
             # list of fototrappole
             with engine.connect() as conn:
@@ -920,6 +1099,9 @@ def save_fototrappola():
 @app.route(APP_ROOT + "/sighting_list")
 @login_required
 def sighting_list():
+    """
+    display sighting list for user
+    """
     with engine.connect() as conn:
         query = text("""
             SELECT s.id, s.code, s.timestamp, s.camtrap_id, s.wolf_number,
@@ -993,7 +1175,7 @@ def upload_camtrap_video():
     # check if md5 already in DB
     with engine.connect() as conn:
         query = text(
-            "SELECT code, operator, camtrap_id "
+            "SELECT sighting.id AS id, code, operator, camtrap_id "
             "FROM media,sighting "
             "WHERE sighting.id = media.sighting_id AND file_content_md5 = :file_content_md5"
         )
@@ -1004,7 +1186,7 @@ def upload_camtrap_video():
         )
         if row is not None:
             flash(
-                f"Il file {video.filename} è già presente nel database: {row['operator']}, {row['code']}, {row['camtrap_id']}",
+                f'Il file {video.filename} è già presente nel database: {row["operator"]}, <a href="{APP_ROOT + "/view/"}{row["id"]}">{row["code"]}</a>, {row["camtrap_id"]}',
                 "danger",
             )
             return redirect(url_for("upload_camtrap_video_form"))
@@ -1041,13 +1223,15 @@ def upload_camtrap_video():
 
     time_ = ""
 
+    # default sighting code
     code: str = ""
     if data["date"]:
-        code = data["date"][2:].replace("-", "") + session["code"]
+        code = f"A{data['date'][2:].replace('-', '')}{session['code']}"
     else:
-        code = session["code"]
+        code = f"A{session['code']}"
+
     try:
-        time_ = data["time"][:2] + ":" + data["time"][2:4] + ":" + data["time"][4:6]
+        time_ = f"{data['time'][:2]}:{data['time'][2:4]}:{data['time'][4:6]}"
     except Exception:
         time_ = data["time"]
 
@@ -1085,6 +1269,9 @@ def uploaded_file(filename):
 @app.route(APP_ROOT + "/view/<int:sighting_id>")
 @login_required
 def view(sighting_id: int):
+    """
+    display sighting
+    """
     with engine.connect() as conn:
         query = text("""
             SELECT s.id, s.code, s.operator, s.camtrap_id, s.scalp, m.image,
@@ -1104,7 +1291,7 @@ def view(sighting_id: int):
 
     user = get_user(row["operator"])
     return render_template(
-        "view.html",
+        "view_sighting.html",
         row=row,
         user=user["fullname"],
         institution=user["institution"],

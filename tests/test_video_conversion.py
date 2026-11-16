@@ -156,8 +156,16 @@ class ConversionRouteTests(unittest.TestCase):
         self.assertIsNone(self.client.get(url).json["download_url"])
         self.assertEqual(self.parameters[-1][1]["operator"], "user")
         self.job["status"] = "completed"
+        self.job["transfer_status"] = "completed"
+        self.assertIsNone(self.client.get(url).json["download_url"])
+        output = Path(self.directory.name) / self.job["output_filename"]
+        output.write_bytes(b"local MP4")
         response = self.client.get(url)
         self.assertTrue(response.json["download_url"].endswith("sample.mp4.compressed.mp4"))
+        output.unlink()
+        response = self.client.get(url)
+        self.assertIsNone(response.json["download_url"])
+        self.assertEqual(response.json["transfer_status"], "completed")
         self.job = None
         self.assertEqual(self.client.get(url).status_code, 404)
 
@@ -213,6 +221,8 @@ class QueuePostgresTests(unittest.TestCase):
         self.conn = self.database.connect()
         self.transaction = self.conn.begin()
         self.conn.execute(text("CREATE TEMP TABLE video_conversions (LIKE public.video_conversions INCLUDING ALL) ON COMMIT DROP"))
+        self.conn.execute(text("CREATE TEMP TABLE archive_transfers (LIKE public.archive_transfers INCLUDING ALL) ON COMMIT DROP"))
+        self.conn.execute(text("CREATE TEMP TABLE archive_downloads (LIKE public.archive_downloads INCLUDING ALL) ON COMMIT DROP"))
         self.conn.execute(text("CREATE TEMP TABLE media (id INTEGER PRIMARY KEY, new_file_name TEXT, converted_file_name TEXT) ON COMMIT DROP"))
         self.directory = tempfile.TemporaryDirectory()
         self.folder = Path(self.directory.name)

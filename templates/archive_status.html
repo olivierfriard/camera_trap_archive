@@ -1,55 +1,96 @@
-            {% if new_file_name %}
-            <div class="box">
-                <h2 class="subtitle is-5">Preparazione MP4 per l'archivio</h2>
-                <p id="conversionStatus" role="status" aria-live="polite">Verifica della conversione…</p>
-                <p id="transferStatus" class="mt-2" role="status" aria-live="polite"></p>
-                <a id="archiveDownload" class="button is-small mt-3 is-hidden" download>Scarica MP4 compresso</a>
-            </div>
-            {% endif %}
-    {% if new_file_name %}
-    <script>
-        const conversionStatus = document.getElementById("conversionStatus");
-        const archiveDownload = document.getElementById("archiveDownload");
-        const transferStatus = document.getElementById("transferStatus");
-        const conversionStatusUrl = {{ url_for('video_conversion_status', filename=new_file_name) | tojson }};
-        async function refreshConversionStatus() {
-            try {
-                const response = await fetch(conversionStatusUrl, {cache: "no-store", redirect: "error"});
-                if (response.status === 404) {
-                    conversionStatus.textContent = "Conversione non programmata per questo video.";
-                    return;
-                }
-                if (!response.ok) throw new Error("Cannot read conversion status");
-                const data = await response.json();
-                const transferMessages = {
-                    pending: "Trasferimento su Google Drive in attesa.",
-                    processing: "Trasferimento su Google Drive in corso.",
-                    completed: "MP4 archiviato su Google Drive e verificato.",
-                    failed: "Trasferimento su Google Drive non riuscito. Il file locale è conservato.",
-                };
-                transferStatus.textContent = transferMessages[data.transfer_status] || (
-                    data.saved ? "Trasferimento previsto dopo la conversione." : "Il trasferimento su Google Drive inizierà dopo il salvataggio dei dati."
-                );
-                if (data.status === "completed") {
-                    conversionStatus.textContent = "MP4 compresso pronto per l'archivio.";
-                    archiveDownload.href = data.download_url;
-                    archiveDownload.classList.remove("is-hidden");
-                    if (!data.saved || data.transfer_status === "completed" || data.transfer_status === "failed") return;
-                }
-                if (data.status === "failed") {
-                    conversionStatus.textContent = "Conversione non riuscita. Puoi comunque salvare i dati; il video originale è conservato.";
-                    return;
-                }
-                if (data.status !== "completed") {
-                    conversionStatus.textContent = data.status === "processing"
-                        ? "Conversione in corso. Puoi compilare e salvare i dati senza attendere."
-                        : "Conversione in attesa. Puoi compilare e salvare i dati senza attendere.";
-                }
-            } catch (error) {
-                conversionStatus.textContent = "Stato della conversione temporaneamente non disponibile.";
+{% if new_file_name %}
+<div class="box">
+    <p id="conversionStatus" role="status" aria-live="polite">Verifica della conversione…</p>
+    <p id="transferStatus" class="mt-2" role="status" aria-live="polite"></p>
+    <p><a id="archiveDownload" class="button is-small mt-3 is-hidden" download>Scarica il video</a></p>
+    <p><button id="archiveRestore" type="button" class="button is-small mt-3 is-hidden">Recupera dall'archivio</button></p>
+    <p id="restoreStatus" class="help" role="status" aria-live="polite"></p>
+</div>
+{% endif %}
+{% if new_file_name %}
+<script>
+    const conversionStatus = document.getElementById("conversionStatus");
+    const archiveDownload = document.getElementById("archiveDownload");
+    const transferStatus = document.getElementById("transferStatus");
+    const archiveRestore = document.getElementById("archiveRestore");
+    const restoreStatus = document.getElementById("restoreStatus");
+    let restoreUrl = null;
+    let restoreToken = null;
+    let restoring = false;
+    let refreshTimer = null;
+    const conversionStatusUrl = {{url_for('video_conversion_status', filename = new_file_name) | tojson }};
+    async function refreshConversionStatus() {
+        clearTimeout(refreshTimer);
+        try {
+            const response = await fetch(conversionStatusUrl, {cache: "no-store", redirect: "error"});
+            if (response.status === 404) {
+                conversionStatus.textContent = "Conversione non programmata per questo video.";
+                return;
             }
-            setTimeout(refreshConversionStatus, 5000);
+            if (!response.ok) throw new Error("Cannot read conversion status");
+            const data = await response.json();
+            const downloadAvailable = data.status === "completed" && Boolean(data.download_url);
+            archiveDownload.classList.toggle("is-hidden", !downloadAvailable);
+            if (downloadAvailable) archiveDownload.href = data.download_url;
+            else archiveDownload.removeAttribute("href");
+            restoreUrl = data.restore_url;
+            restoreToken = data.restore_csrf_token;
+            const restoreRunning = !downloadAvailable && ["pending", "processing"].includes(data.restore_status);
+            archiveRestore.classList.toggle("is-hidden", downloadAvailable || !restoreUrl || restoreRunning);
+            archiveRestore.textContent = data.restore_status === "failed" ? "Riprova il recupero" : "Recupera dall'archivio";
+            restoreStatus.textContent = downloadAvailable ? "" : restoreRunning
+                ? (data.restore_status === "processing" ? "Recupero in corso…" : "Recupero dall'archivio in attesa…")
+                : data.restore_status === "failed" ? "Recupero non riuscito. Puoi riprovare." : "";
+            const transferMessages = {
+                pending: "Trasferimento sull'archivio in attesa.",
+                processing: "Trasferimento sull'archivio in corso.",
+                completed: "Video archiviato e verificato",
+                failed: "Trasferimento sull'archivio non riuscito. Il file locale è conservato.",
+            };
+            transferStatus.textContent = transferMessages[data.transfer_status] || (
+                data.saved ? "Trasferimento previsto dopo la conversione." : "Il trasferimento sullarchivio inizierà dopo il salvataggio dei dati."
+            );
+            transferStatus.classList.toggle("tag", data.transfer_status === "completed");
+            transferStatus.classList.toggle("is-success", data.transfer_status === "completed");
+            if (data.status === "completed") {
+                conversionStatus.textContent = ""; // Video compresso pronto per l'archivio.
+                if (!restoreRunning && (!data.saved || data.transfer_status === "completed" || data.transfer_status === "failed")) return;
+            }
+            if (data.status === "failed") {
+                conversionStatus.textContent = "Conversione non riuscita. Puoi comunque salvare i dati; il video originale è conservato.";
+                return;
+            }
+            if (data.status !== "completed") {
+                conversionStatus.textContent = data.status === "processing"
+                    ? "Conversione in corso. Puoi compilare e salvare i dati senza attendere."
+                    : "Conversione in attesa. Puoi compilare e salvare i dati senza attendere.";
+            }
+        } catch (error) {
+            conversionStatus.textContent = "Stato della conversione temporaneamente non disponibile.";
         }
-        refreshConversionStatus();
-    </script>
-    {% endif %}
+        refreshTimer = setTimeout(refreshConversionStatus, 5000);
+    }
+    archiveRestore.addEventListener("click", async () => {
+        if (!restoreUrl || restoring) return;
+        restoring = true;
+        archiveRestore.disabled = true;
+        archiveRestore.classList.add("is-loading");
+        restoreStatus.textContent = "Richiesta di recupero…";
+        try {
+            const response = await fetch(restoreUrl, {
+                method: "POST", redirect: "error",
+                headers: {"X-CSRF-Token": restoreToken},
+            });
+            if (!response.ok) throw new Error("Cannot request archive recovery");
+            await refreshConversionStatus();
+        } catch (error) {
+            restoreStatus.textContent = "Impossibile avviare il recupero. Riprova.";
+        } finally {
+            restoring = false;
+            archiveRestore.disabled = false;
+            archiveRestore.classList.remove("is-loading");
+        }
+    });
+    refreshConversionStatus();
+</script>
+{% endif %}

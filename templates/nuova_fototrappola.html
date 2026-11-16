@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Nuova fototrappola{% endblock %}
+{% block title %}{{ "Fototrappola" if is_edit else "Nuova fototrappola" }}{% endblock %}
 
 {% block head %}
 <!-- Leaflet CSS -->
@@ -22,9 +22,11 @@
 {% endblock %}
 
 {% block content %}
+{% set values = form_values|default({}) %}
 <section class="section">
     <div class="container">
-        <h1 class="title is-3">Nuova fototrappola</h1>
+        <h1 class="title is-3">{% if is_edit %}Fototrappola: {{ values.codice }}{% else %}Nuova fototrappola{% endif %}
+        </h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -48,14 +50,20 @@
         {% endif %}
         {% endwith %}
 
-        <form method="post" action="{{ url_for('save_fototrappola') }}">
+        <form method="post"
+            action="{{ url_for('edit_fototrappola', codice=values.codice) if is_edit else url_for('save_fototrappola') }}">
+            {% if is_edit %}
+            <input type="hidden" name="csrf_token" value="{{ session['fototrappola_csrf_token'] }}" />
+            {% endif %}
 
             <div class="columns is-multiline">
                 <div class="column is-one-third">
                     <div class="field">
                         <label class="label">Codice</label>
                         <div class="control">
-                            <input class="input" name="codice" required />
+                            <input class="input" name="codice" required
+                                value="{{ values.get('codice', '') if values.get('codice', '') is not none else '' }}"
+                                {% if is_edit %}readonly{% endif %} />
                         </div>
                     </div>
                 </div>
@@ -64,7 +72,8 @@
                     <div class="field">
                         <label class="label">Tipo</label>
                         <div class="control">
-                            <input class="input" name="tipo" required />
+                            <input class="input" name="tipo" required
+                                value="{{ values.get('tipo', '') if values.get('tipo', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
@@ -73,7 +82,8 @@
                     <div class="field">
                         <label class="label">Intersezioni</label>
                         <div class="control">
-                            <input class="input" name="intersezioni" />
+                            <input class="input" name="intersezioni"
+                                value="{{ values.get('intersezioni', '') if values.get('intersezioni', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
@@ -84,7 +94,8 @@
                     <div class="field">
                         <label class="label">Data Inizio</label>
                         <div class="control">
-                            <input class="input" type="date" name="data_inizio" required />
+                            <input class="input" type="date" name="data_inizio" required
+                                value="{{ values.get('data_inizio', '') if values.get('data_inizio', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
@@ -93,7 +104,8 @@
                     <div class="field">
                         <label class="label">Data Fine</label>
                         <div class="control">
-                            <input class="input" type="date" name="data_fine" />
+                            <input class="input" type="date" name="data_fine"
+                                value="{{ values.get('data_fine', '') if values.get('data_fine', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
@@ -102,7 +114,8 @@
                     <div class="field">
                         <label class="label">Nome</label>
                         <div class="control">
-                            <input class="input" name="nome" />
+                            <input class="input" name="nome"
+                                value="{{ values.get('nome', '') if values.get('nome', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
@@ -111,7 +124,8 @@
                     <div class="field">
                         <label class="label">Cognome</label>
                         <div class="control">
-                            <input class="input" name="cognome" />
+                            <input class="input" name="cognome"
+                                value="{{ values.get('cognome', '') if values.get('cognome', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
@@ -123,7 +137,8 @@
                     <div class="field">
                         <label class="label" for="location">Località</label>
                         <div class="control">
-                            <input class="input" id="location" name="location" />
+                            <input class="input" id="location" name="location"
+                                value="{{ values.get('location', '') if values.get('location', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
@@ -132,7 +147,8 @@
                     <div class="field">
                         <label class="label">Comune</label>
                         <div class="control">
-                            <input class="input" name="comune" required />
+                            <input class="input" name="comune" required
+                                value="{{ values.get('comune', '') if values.get('comune', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
@@ -142,7 +158,8 @@
                     <div class="field">
                         <label class="label">Provincia</label>
                         <div class="control">
-                            <input class="input" name="provincia" required />
+                            <input class="input" name="provincia" required
+                                value="{{ values.get('provincia', '') if values.get('provincia', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
@@ -154,7 +171,8 @@
                     <div class="field">
                         <label class="label">Regione</label>
                         <div class="control">
-                            <input class="input" name="regione" required />
+                            <input class="input" name="regione" required
+                                value="{{ values.get('regione', '') if values.get('regione', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
@@ -165,7 +183,8 @@
             <div class="field">
                 <label class="label">Paese (default: Italia)</label>
                 <div class="control">
-                    <input class="input" name="country" value="Italia" />
+                    <input class="input" name="country"
+                        value="{{ values.get('country', 'Italia') if values.get('country', 'Italia') is not none else '' }}" />
                 </div>
             </div>
 
@@ -173,28 +192,31 @@
             <div class="columns is-multiline">
                 <div class="column is-one-third">
                     <div class="field">
-                        <label class="label">Latitudine</label>
+                        <label class="label">Latitudine (gradi decimali)</label>
                         <div class="control">
-                            <input class="input" id="latInput" name="latitudine" required />
+                            <input class="input" id="latInput" name="latitudine" required
+                                value="{{ values.get('latitudine', '') if values.get('latitudine', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
 
                 <div class="column is-one-third">
                     <div class="field">
-                        <label class="label">Longitudine</label>
+                        <label class="label">Longitudine (gradi decimali)</label>
                         <div class="control">
-                            <input class="input" id="lngInput" name="longitudine" required />
+                            <input class="input" id="lngInput" name="longitudine" required
+                                value="{{ values.get('longitudine', '') if values.get('longitudine', '') is not none else '' }}" />
                         </div>
                     </div>
                 </div>
 
                 <div class="column is-one-third">
                     <div class="field">
-                        <label class="label">Altitudine</label>
+                        <label class="label">Altitudine (m)</label>
                         <div class="control">
                             <input class="input" id="altInput" type="number" step="1" name="altitudine"
-                                aria-describedby="altitudeStatus altitudeSource" />
+                                aria-describedby="altitudeStatus altitudeSource"
+                                value="{{ values.get('altitudine', '') if values.get('altitudine', '') is not none else '' }}" />
                         </div>
                         <p class="help" id="altitudeStatus" role="status" aria-live="polite"></p>
 
@@ -246,10 +268,14 @@
 
             <div class="field is-grouped">
                 <div class="control">
-                    <button class="button is-primary" type="submit">Salva</button>
+                    <button class="button is-primary" type="submit">{{ "Salva modifiche" if is_edit else "Salva"
+                        }}</button>
                 </div>
             </div>
 
+            {% if is_edit %}
+            <a class="button is-light" href="{{ url_for('elenco_fototrappole') }}">Torna all'elenco</a>
+            {% endif %}
         </form>
     </div>
 </section>
@@ -438,7 +464,7 @@
         map.panTo([lat, lng]);
     }
 
-    function syncFromGeographic() {
+    function syncFromGeographic(lookup = true) {
         utmFields.forEach(field => {field.setCustomValidity(""); field.value = "";});
         latInput.setCustomValidity("");
         lngInput.setCustomValidity("");
@@ -465,8 +491,10 @@
                 }
             }
         }
-        scheduleElevation();
-        scheduleAddress();
+        if (lookup) {
+            scheduleElevation();
+            scheduleAddress();
+        }
     }
 
     function syncFromUtm() {
@@ -510,6 +538,6 @@
     lngInput.addEventListener("input", syncFromGeographic);
     utmFields.forEach(field => field.addEventListener("input", syncFromUtm));
     map.on("click", e => setCoords(e.latlng.lat, e.latlng.lng));
-    syncFromGeographic();
+    syncFromGeographic({{'false' if is_edit else 'true'}});
 </script>
 {% endblock %}

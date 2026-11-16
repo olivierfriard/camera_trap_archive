@@ -91,6 +91,7 @@ class ArchiveQueuePostgresTests(unittest.TestCase):
         self.transaction = self.conn.begin()
         self.conn.execute(text("CREATE TEMP TABLE video_conversions (LIKE public.video_conversions INCLUDING ALL) ON COMMIT DROP"))
         self.conn.execute(text("CREATE TEMP TABLE archive_transfers (LIKE public.archive_transfers INCLUDING ALL) ON COMMIT DROP"))
+        self.conn.execute(text("CREATE TEMP TABLE archive_downloads (LIKE public.archive_downloads INCLUDING ALL) ON COMMIT DROP"))
         self.conn.execute(text("CREATE TEMP TABLE media (new_file_name TEXT, converted_file_name TEXT, sighting_id INTEGER) ON COMMIT DROP"))
         self.conn.execute(text("CREATE TEMP TABLE sighting (id INTEGER PRIMARY KEY, operator TEXT) ON COMMIT DROP"))
         self.directory = tempfile.TemporaryDirectory()

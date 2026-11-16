@@ -28,7 +28,7 @@
                 </thead>
                 {% for foto in fototrappole %}
                 <tr>
-                    <td>{{ foto.codice }}</td>
+                    <td><a href="{{ url_for('edit_fototrappola', codice=foto.codice) }}">{{ foto.codice }}</a></td>
                     <td>{{ foto.tipo }}</td>
                     <td>{{ foto.nome }} {{ foto.cognome }}</td>
                     <td>{{ foto.data_inizio }}</td>

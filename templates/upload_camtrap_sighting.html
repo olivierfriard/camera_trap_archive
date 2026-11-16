@@ -5,194 +5,187 @@
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
-    <style>
-        #map {
-            height: 400px;
-            width: 100%;
-            border-radius: 8px;
-        }
+<style>
+    #map {
+        height: 400px;
+        width: 100%;
+        border-radius: 8px;
+    }
 
-        video {
-            max-width: 100%;
-            margin-top: 1rem;
-            border-radius: 8px;
-        }
-    </style>
+    video {
+        max-width: 100%;
+        margin-top: 1rem;
+        border-radius: 8px;
+    }
+</style>
 
-    <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+<!-- HTMX -->
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
 {% endblock %}
 
 {% block content %}
 <section class="section">
-        <div class="container">
-            <h1 class="title is-3">Avistamento fototrappola</h1>
+    <div class="container">
+        <h1 class="title is-3">Avistamento fototrappola</h1>
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            <div id="flashes">
-                {% for category, msg in messages %}
-                {# Map Flask categories to Bulma notification classes #}
-                {% set bulma_class = {
-                'success': 'is-success',
-                'warning': 'is-warning',
-                'info': 'is-info',
-                'danger': 'is-danger',
-                'error': 'is-danger'
-                }[category] if category in ['success','warning','info','danger','error'] else 'is-light' %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div id="flashes">
+            {% for category, msg in messages %}
+            {# Map Flask categories to Bulma notification classes #}
+            {% set bulma_class = {
+            'success': 'is-success',
+            'warning': 'is-warning',
+            'info': 'is-info',
+            'danger': 'is-danger',
+            'error': 'is-danger'
+            }[category] if category in ['success','warning','info','danger','error'] else 'is-light' %}
 
-                <div class="notification {{ bulma_class }}">
-                    <button class="delete" aria-label="dismiss"></button>
-                    {{ msg }}
-                </div>
-                {% endfor %}
+            <div class="notification {{ bulma_class }}">
+                <button class="delete" aria-label="dismiss"></button>
+                {{ msg }}
             </div>
-            {% endif %}
-            {% endwith %}
-            {% if video_url or new_file_name %}
-            <div class="box mt-5">
-                <h2 class="subtitle is-4">Anteprima video caricato</h2>
-                {% if video_url %}
-                <video id="video_camtrap" src="{{ video_url }}" width="720" preload="metadata" controls></video>
-                {% else %}
-                <p class="notification is-warning">Anteprima non disponibile. Puoi comunque compilare e salvare i dati.</p>
-                <a class="button is-small" href="{{ url_for('uploaded_file', filename=new_file_name) }}" download>Scarica il video originale</a>
-                {% endif %}
-                <div class="columns mt-3">
-                    <div class="column is-half">
-                        <div class="field">
-                            <label class="label" for="sightingDate">Data</label>
-                            <div class="control">
-                                <input class="input" id="sightingDate" name="date" type="text" form="uploadForm" value="{{ date or '' }}" placeholder="AAAA-MM-GG" />
-                            </div>
-                            <p class="help">Formato AAAA-MM-GG.</p>
-                        </div>
-                    </div>
-                    <div class="column is-half">
-                        <div class="field">
-                            <label class="label" for="sightingTime">Ora</label>
-                            <div class="control">
-                                <input class="input" id="sightingTime" name="time_" type="text" form="uploadForm" value="{{ time_ or '' }}" placeholder="HH:MM:SS" />
-                            </div>
-                            <p class="help">Formato HH:MM o HH:MM:SS. Ora locale: {{ config['SIGHTING_TIMEZONE'] }}.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
-            {% include "archive_status.html" %}
-
-            <form id="uploadForm" method="post" action="{{ url_for('save_sighting') }}" enctype="multipart/form-data">
-                <input type="hidden" name="original_file_name" value="{{ original_file_name }}" />
-                <input type="hidden" name="new_file_name" value="{{ new_file_name }}" />
-                <input type="hidden" name="file_content_md5" value="{{ file_content_md5 }}" />
-                <div class="field">
-                    <label class="label">Operatore</label>
-                    <div class="control">
-                        <input class="input" name="operator" type="text" placeholder="operatore" value="{{ operator }}"
-                            readonly />
-                    </div>
-                </div>
-                <div class="columns is-multiline">
-                    <div class="column is-third">
-                        <div class="field">
-                            <label class="label">ID fototrappola</label>
-                            <div class="control">
-                                <div class="select">
-
-                                    <!--    <select id="codice_fototrappola"     name="codice_fototrappola"          required       >
-                                         <option value="">Seleziona un codice</option>
-                                         {% for foto in fototrappole %}
-                                         <option value="{{ foto }}">{{ foto.codice }}</option>
-                                         {% endfor %}
-                                     </select>
--->
-                                    <select name="camtrap_id" hx-get="/get_fototrappola_data" hx-trigger="change" hx-sync="this:replace"
-                                        hx-target="#details" hx-include="this">
-                                        <option value="">-- scegli una fototrappola --</option>
-                                        {% for foto in fototrappole %}
-                                        <option value="{{ foto.codice }}" {% if camtrap_id==foto.codice
-                                            %}selected{%endif%}>{{ foto.codice }}</option>
-                                        {% endfor %}
-                                    </select>
-
-                                </div>
-
-                                <!-- <input class="input" name="camtrap_id" type="text" required value="{{ camtrap_id }}" /> -->
-
-                            </div>
-                        </div>
-                    </div>
-                    <div class="column is-third">
-                        <div id="details" class="box">
-                            {% include "fototrappola_details.html" %}
-                        </div>
-                    </div>
-                    <div class="column is-third">
-                        <div class="field">
-                            <label class="label">Codice avistamento</label>
-                            <div class="control">
-                                <input class="input" name="code" type="text" value="{{ code }}" required />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {% include "sighting_coordinates_editor.html" %}
-
-                <div class="columns is-multiline">
-                    <div class="column is-half">
-                        <div class="field">
-                            <label class="label">Numero di lupi</label>
-                            <div class="control">
-                                <input class="input" name="wolf_number" type="number" min="0" max="120" step="1"
-                                    required value="{{ wolf_number }}" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="column is-half">
-                        <div class="field">
-                            <label class="label" for="scalp">SCALP</label>scalp: {{ scalp }}
-                            <div class="control">
-                                <div class="select">
-                                    <select id="scalp" name="scalp" required>
-                                        <option value="">Seleziona un codice</option>
-                                        <option value="C1" {% if scalp=="C1" %}selected{%endif%}>C1</option>
-                                        <option value="C3" {% if scalp=="C3" %}selected{%endif%}>C3</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="field">
-                    <label class="label">Note</label>
-                    <div class="control">
-                        <textarea name="note" class="textarea" placeholder="Digitate le vostre note...">
-                            {{ notes }}</textarea>
-                    </div>
-                </div>
-
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button class="button is-primary" type="submit">
-                            Salva dati
-                        </button>
-                    </div>
-                </div>
-            </form>
-
-
-
+            {% endfor %}
         </div>
-    </section>
+        {% endif %}
+        {% endwith %}
+        {% if video_url or new_file_name %}
+        <div class="box mt-5">
+            {% if video_url %}
+            <video id="video_camtrap" src="{{ video_url }}" width="720" preload="metadata" controls></video>
+            {% else %}
+            <p class="notification is-warning">Anteprima non disponibile. Puoi comunque compilare e salvare i dati.</p>
+            <a class="button is-small" href="{{ url_for('uploaded_file', filename=new_file_name) }}" download>Scarica il
+                video originale</a>
+            {% endif %}
+            <div class="columns mt-3">
+                <div class="column is-half">
+                    <div class="field">
+                        <label class="label" for="sightingDate">Data</label>
+                        <div class="control">
+                            <input class="input" id="sightingDate" name="date" type="text" form="uploadForm"
+                                value="{{ date or '' }}" placeholder="AAAA-MM-GG" />
+                        </div>
+                        <p class="help">Formato ISO (AAAA-MM-GG)</p>
+                    </div>
+                </div>
+                <div class="column is-half">
+                    <div class="field">
+                        <label class="label" for="sightingTime">Ora</label>
+                        <div class="control">
+                            <input class="input" id="sightingTime" name="time_" type="text" form="uploadForm"
+                                value="{{ time_ or '' }}" placeholder="HH:MM:SS" />
+                        </div>
+                        <p class="help">Formato HH:MM o HH:MM:SS. Ora locale: {{ config['SIGHTING_TIMEZONE'] }}.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# {% include "archive_status.html" %} #}
+
+        <form id="uploadForm" method="post" action="{{ url_for('save_sighting') }}" enctype="multipart/form-data">
+            <input type="hidden" name="original_file_name" value="{{ original_file_name }}" />
+            <input type="hidden" name="new_file_name" value="{{ new_file_name }}" />
+            <input type="hidden" name="file_content_md5" value="{{ file_content_md5 }}" />
+            <div class="field">
+                <label class="label">Operatore</label>
+                <div class="control">
+                    <input class="input" name="operator" type="text" placeholder="operatore" value="{{ operator }}"
+                        readonly />
+                </div>
+            </div>
+            <div class="columns is-multiline">
+                <div class="column is-third">
+                    <div class="field">
+                        <label class="label">ID fototrappola</label>
+                        <div class="control">
+                            <div class="select">
+
+                                <select name="camtrap_id" hx-get="/get_fototrappola_data" hx-trigger="change"
+                                    hx-sync="this:replace" hx-target="#details" hx-include="this">
+                                    <option value="">-- scegli una fototrappola --</option>
+                                    {% for foto in fototrappole %}
+                                    <option value="{{ foto.codice }}" {% if camtrap_id==foto.codice %}selected{%endif%}>
+                                        {{ foto.codice }}</option>
+                                    {% endfor %}
+                                </select>
+
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-third">
+                    <div id="details" class="box">
+                        {% include "fototrappola_details.html" %}
+                    </div>
+                </div>
+                <div class="column is-third">
+                    <div class="field">
+                        <label class="label">Codice avistamento</label>
+                        <div class="control">
+                            <input class="input" name="code" type="text" value="{{ code }}" required />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% include "sighting_coordinates_editor.html" %}
+
+            <div class="columns is-multiline">
+                <div class="column is-half">
+                    <div class="field">
+                        <label class="label">Numero di lupi</label>
+                        <div class="control">
+                            <input class="input" name="wolf_number" type="number" min="0" max="120" step="1" required
+                                value="{{ wolf_number }}" />
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-half">
+                    <div class="field">
+                        <label class="label" for="scalp">SCALP</label>scalp: {{ scalp }}
+                        <div class="control">
+                            <div class="select">
+                                <select id="scalp" name="scalp" required>
+                                    <option value="">Seleziona un codice</option>
+                                    <option value="C1" {% if scalp=="C1" %}selected{%endif%}>C1</option>
+                                    <option value="C3" {% if scalp=="C3" %}selected{%endif%}>C3</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="label">Note</label>
+                <div class="control">
+                    <textarea name="note" class="textarea" placeholder="Digitate le vostre note...">
+                        {{ notes }}</textarea>
+                </div>
+            </div>
+
+            <div class="field is-grouped">
+                <div class="control">
+                    <button class="button is-primary" type="submit">
+                        Salva dati
+                    </button>
+                </div>
+            </div>
+        </form>
+
+
+
+    </div>
+</section>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="https://cdn.jsdelivr.net/npm/proj4@2.22.0/dist/proj4.js" crossorigin="anonymous"></script>
-    <script src="{{ url_for('static', filename='js/utm-coordinates.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/sighting-coordinates.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/proj4@2.22.0/dist/proj4.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/utm-coordinates.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sighting-coordinates.js') }}"></script>
 {% endblock %}
