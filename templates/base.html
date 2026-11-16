@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="it">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Archivio avistamenti{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css" />
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        main {
+            flex: 1;
+        }
+
+        .navbar button.navbar-link {
+            border: 0;
+            background: transparent;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        @media screen and (max-width: 1023px) {
+            .navbar .has-dropdown:not(.is-active) .navbar-dropdown {
+                display: none;
+            }
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+    <nav class="navbar has-shadow" aria-label="Navigazione principale">
+        <div class="navbar-brand">
+            <a class="navbar-item has-text-weight-semibold" href="{{ url_for('index') }}">Archivio avistamenti</a>
+            <button type="button" class="navbar-burger" aria-label="Apri menu" aria-expanded="false"
+                aria-controls="main-menu">
+                <span aria-hidden="true"></span><span aria-hidden="true"></span>
+                <span aria-hidden="true"></span><span aria-hidden="true"></span>
+            </button>
+        </div>
+        <div id="main-menu" class="navbar-menu">
+            <div class="navbar-start">
+                <div class="navbar-item has-dropdown">
+                    <button type="button" class="navbar-link" aria-expanded="false"
+                        aria-controls="sighting-menu">Avvistamento</button>
+                    <div id="sighting-menu" class="navbar-dropdown">
+                        <a class="navbar-item" href="{{ url_for('nuovo_avvistamento') }}">Nuovo</a>
+                        <a class="navbar-item" href="{{ url_for('sighting_list') }}">Elenco</a>
+                    </div>
+                </div>
+                <div class="navbar-item has-dropdown">
+                    <button type="button" class="navbar-link" aria-expanded="false"
+                        aria-controls="camtrap-menu">Fototrappole</button>
+                    <div id="camtrap-menu" class="navbar-dropdown">
+                        <a class="navbar-item" href="{{ url_for('nuova_fototrappola') }}">Nuovo</a>
+                        <a class="navbar-item" href="{{ url_for('elenco_fototrappole') }}">Elenco</a>
+                    </div>
+                </div>
+            </div>
+            <div class="navbar-end">
+                {% if session.get('username') %}
+                <div class="navbar-item">Utente: {{ session.get('fullname') or session['username'] }}</div>
+                <div class="navbar-item"><a class="button is-light" href="{{ url_for('logout') }}">Logout</a></div>
+                {% else %}
+                <div class="navbar-item"><a class="button is-primary" href="{{ url_for('login') }}">Login</a></div>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    <main>{% block content %}{% endblock %}</main>
+    {% include "footer.html" %}
+    <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>
