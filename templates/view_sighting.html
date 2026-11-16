@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "fototrappola_coordinates.html" import coordinates, coordinate_scripts %}
+
+
+{% block content %}
+<section class="section">
+    <div class="container">
+
+        <h1 class="title has-text-centered">
+            Archivio fototrappole
+        </h1>
+        <h2 class="title is-4 has-text-centered">Avvistamento</h2>
+
+        <br><br>
+
+
+        <h2 class="title is-4">Code: {{ row.code }}</h2>
+
+        {{ user }} ({{ row.operator }}) {{ institution }}<br>
+
+        Id fototrappola: <b>{{ row.camtrap_id }}</b><br>
+
+        <div class="box mt-4">
+            {{ coordinates(row.latitude, row.longitude, row.coordinate_source) }}
+        </div>
+
+        Number of wolves; <b>{{ row.wolf_number }}</b><br>
+
+        SCALP: <b>{{ row.scalp }}</b><br>
+
+        Note: {{ row.notes if row.notes is not none else ''}}
+
+
+        <br>
+        <br>
+        <img src="{{ data_uri }}" alt="inline image">
+
+        {% include "archive_status.html" %}
+
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{{ coordinate_scripts() }}
+{% endblock %}
