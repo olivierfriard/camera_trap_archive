@@ -64,8 +64,10 @@ directly into the configured folder under its unique compressed filename.
 The worker runs `rclone copyto --checksum --immutable`, then reads the remote MD5
 and compares it with `video_conversions.output_md5`. Only a matching checksum
 marks the transfer completed. Retries use the same destination and will skip
-identical remote content. Existing different content is not overwritten. All
-local files are retained.
+identical remote content. Existing different content is not overwritten. Local
+files are retained until the optional [cron cleanup job](local-video-cleanup.md)
+removes originals and archive MP4s after their retention period. Previews remain
+available even when the uploaded original has been removed.
 Before copying, an existing remote file's MD5 is checked explicitly: matching
 content is reused, while different content raises an error without overwriting it.
 Transfer state is visible both during entry and in the saved sighting view.
@@ -77,6 +79,6 @@ to specify an executable; otherwise PATH and `~/.local/bin/rclone` are checked.
 The worker must run as the Linux account with the configured Drive remote.
 
 Restart an already-running worker after updating its code or `.env`; its advisory
-lock prevents a new worker from replacing it automatically. No systemd timer is
-required. If `archive_storage` is unset, only conversion runs. Logs remain in
+lock prevents a new worker from replacing it automatically. The conversion worker
+does not require a separate scheduler. If `archive_storage` is unset, only conversion runs. Logs remain in
 `instance/video-conversion.log`.

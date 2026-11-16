@@ -1,0 +1,5 @@
+# Add this line using crontab -e as the production application user.
+# Replace every /srv/camera_trap_archive path with the production project path.
+# Create instance/ with write permission for that user before enabling the job.
+# This is a user crontab: do not add a username column.
+0 3 * * * "/srv/camera_trap_archive/.venv/bin/python" "/srv/camera_trap_archive/scripts/cleanup_local_videos.py" --config "/srv/camera_trap_archive/.env" --apply >> "/srv/camera_trap_archive/instance/video-cleanup.log" 2>&1

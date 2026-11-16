@@ -408,13 +408,17 @@ def video_preview_url(filename, create=False):
     preview = source.with_name(source.name + ".preview-640.mp4")
     temporary = None
     try:
+        try:
+            source_mtime = source.stat().st_mtime
+        except FileNotFoundError:
+            source_mtime = None
         if (
             preview.is_file()
             and preview.stat().st_size > 0
-            and preview.stat().st_mtime >= source.stat().st_mtime
+            and (source_mtime is None or preview.stat().st_mtime >= source_mtime)
         ):
             return url_for("uploaded_file", filename=preview.name)
-        if not create:
+        if not create or not source.is_file():
             return None
         with NamedTemporaryFile(
             dir=source.parent, suffix=".mp4", delete=False
@@ -564,6 +568,7 @@ def restore_archive_video(filename):
                     SELECT 1 FROM media m JOIN sighting s ON s.id = m.sighting_id
                     WHERE m.new_file_name = v.source_filename AND s.operator = v.operator
                 )
+            FOR UPDATE OF v
         """), {"filename": filename, "operator": session["username"]}).mappings().fetchone()
         if job is None:
             abort(404)

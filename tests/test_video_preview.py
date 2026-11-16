@@ -67,6 +67,22 @@ class VideoPreviewTests(unittest.TestCase):
             self.assertIsNone(self.main.video_preview_url("sample.avi"))
             run.assert_not_called()
 
+    def test_cached_preview_is_available_after_original_cleanup(self):
+        preview = self.folder / "sample.avi.preview-640.mp4"
+        preview.write_bytes(b"retained preview")
+        for create in (False, True):
+            with patch.object(self.main.subprocess, "run") as run:
+                self.assertEqual(
+                    self.main.video_preview_url("sample.avi", create=create),
+                    self.main.url_for("uploaded_file", filename=preview.name),
+                )
+                run.assert_not_called()
+
+    def test_missing_original_and_preview_do_not_trigger_ffmpeg(self):
+        with patch.object(self.main.subprocess, "run") as run:
+            self.assertIsNone(self.main.video_preview_url("missing.avi", create=True))
+            run.assert_not_called()
+
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg tools are required")
     def test_avi_and_mp4_previews_are_640_pixels_wide(self):
         for extension, codec in (("avi", "mjpeg"), ("mp4", "libx264")):
