@@ -35,9 +35,10 @@
         <h1 class="title has-text-centered">
             Elenco avvistamenti{% if camtrap_id %} — Fototrappola {{ camtrap_id }}{% endif %}
         </h1>
-        <p class="subtitle has-text-centered">Avvistamenti caricati da {{ session['fullname'] }}</p>
+        <p class="subtitle has-text-centered">{% if session.get('is_admin') %}{{ selected_owner_label or 'Tutti gli utenti' }}{% else %}Avvistamenti caricati da {{ session['fullname'] }}{% endif %}</p>
+        {% include "user_filter.html" %}
         {% if camtrap_id %}
-        <a class="button is-light" href="{{ url_for('elenco_fototrappole') }}">Torna all'elenco fototrappole</a>
+        <a class="button is-light" href="{{ url_for('elenco_fototrappole', operator=selected_operator) if session.get('is_admin') else url_for('elenco_fototrappole') }}">Torna all'elenco fototrappole</a>
         {% endif %}
 
         <br><br>
@@ -71,6 +72,7 @@
                 </div>
                 <div class="column is-half">
                     <dl class="columns is-multiline is-mobile">
+                        {% if session.get('is_admin') %}{{ detail('Utente', owner_labels.get(sighting.operator, sighting.operator)) }}{% endif %}
                         {{ detail('Data e ora', sighting.date_time) }}
                         {{ detail('ID fototrappola', sighting.camtrap_id) }}
                         {{ detail('Numero di lupi', sighting.wolf_number) }}
@@ -79,7 +81,7 @@
                     {{ coordinates(sighting.latitude, sighting.longitude, sighting.coordinate_source) }}
                     <p class="has-text-weight-semibold">Note</p>
                     <p class="sighting-notes mb-4">{{ sighting.notes if sighting.notes else 'Nessuna nota.' }}</p>
-                    <a class="button is-link is-small" href="{{ url_for('view', sighting_id=sighting.id) }}">Apri
+                    <a class="button is-link is-small" href="{{ url_for('view', sighting_id=sighting.id, operator=selected_operator, camtrap_id=camtrap_id) if session.get('is_admin') else url_for('view', sighting_id=sighting.id) }}">Apri
                         scheda</a>
                 </div>
             </div>

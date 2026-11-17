@@ -27,6 +27,7 @@
     <div class="container">
         <h1 class="title is-3">{% if is_edit %}Fototrappola: {{ values.codice }}{% else %}Nuova fototrappola{% endif %}
         </h1>
+        {% if is_edit and session.get('is_admin') %}<p class="subtitle">Utente: {{ values.operator }}{% if view_only %} — Sola lettura{% endif %}</p>{% endif %}
 
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -51,7 +52,8 @@
         {% endwith %}
 
         <form method="post"
-            action="{{ url_for('edit_fototrappola', codice=values.codice) if is_edit else url_for('save_fototrappola') }}">
+            action="{{ (url_for('edit_fototrappola', codice=values.codice, operator=values.operator) if session.get('is_admin') else url_for('edit_fototrappola', codice=values.codice)) if is_edit else url_for('save_fototrappola') }}">
+            <fieldset {% if view_only %}disabled{% endif %}>
             {% if is_edit %}
             <input type="hidden" name="csrf_token" value="{{ session['fototrappola_csrf_token'] }}" />
             {% endif %}
@@ -260,21 +262,22 @@
 
             <p class="help" id="addressStatus" role="status" aria-live="polite"></p>
 
-            <p class="help">Clicca sulla mappa per impostare le coordinate.</p>
+            <p class="help">{{ 'Mappa della fototrappola.' if view_only else 'Clicca sulla mappa per impostare le coordinate.' }}</p>
             <div id="map" style="height: 400px; border-radius: 8px;"></div>
 
             <br />
 
 
-            <div class="field is-grouped">
+            {% if not view_only %}<div class="field is-grouped">
                 <div class="control">
                     <button class="button is-primary" type="submit">{{ "Salva modifiche" if is_edit else "Salva"
                         }}</button>
                 </div>
-            </div>
+            </div>{% endif %}
 
+            </fieldset>
             {% if is_edit %}
-            <a class="button is-light" href="{{ url_for('elenco_fototrappole') }}">Torna all'elenco</a>
+            <a class="button is-light" href="{{ url_for('elenco_fototrappole', operator=values.operator) if session.get('is_admin') else url_for('elenco_fototrappole') }}">Torna all'elenco</a>
             {% endif %}
         </form>
     </div>
@@ -286,6 +289,7 @@
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.22.0/dist/proj4.js" crossorigin="anonymous"></script>
 <script src="{{ url_for('static', filename='js/utm-coordinates.js') }}"></script>
 <script>
+    const readOnly = {{ view_only|default(false)|tojson }};
     const map = L.map("map").setView([45.0, 7.6], 12);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -453,7 +457,7 @@
 
     function updateMarker(lat, lng) {
         if (!marker) {
-            marker = L.marker([lat, lng], {draggable: true}).addTo(map);
+            marker = L.marker([lat, lng], {draggable: !readOnly}).addTo(map);
             marker.on("dragend", (ev) => {
                 const pos = ev.target.getLatLng();
                 setCoords(pos.lat, pos.lng);
@@ -529,6 +533,7 @@
     }
 
     function setCoords(lat, lng) {
+        if (readOnly) return;
         latInput.value = lat.toFixed(6);
         lngInput.value = lng.toFixed(6);
         syncFromGeographic();

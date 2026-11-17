@@ -10,6 +10,7 @@
             Archivio fototrappole
         </h1>
         <h2 class="title is-4 has-text-centered">Avvistamento</h2>
+        <a class="button is-light" href="{{ list_url }}">Torna all'elenco avvistamenti</a>
 
         <br><br>
 
@@ -33,7 +34,7 @@
 
         <br>
         <br>
-        <img src="{{ data_uri }}" alt="inline image">
+        {% if data_uri %}<img src="{{ data_uri }}" alt="inline image">{% else %}<p>Immagine non disponibile.</p>{% endif %}
 
         {% include "archive_status.html" %}
 

@@ -327,6 +327,28 @@ def logout():
     return redirect(url_for("login"))
 
 
+def list_user_scope(conn):
+    """Resolve list ownership from the current database role, never from a client flag."""
+    if not g.current_user["is_admin"]:
+        return session["username"], {}
+    users = conn.execute(
+        text("SELECT username, fullname, is_active FROM public.users ORDER BY fullname, username")
+    ).mappings().all()
+    labels = {
+        user["username"]: f"{user['fullname'] or user['username']} ({user['username']})"
+        for user in users
+    }
+    operator = request.args.get("operator") or None
+    if operator is not None and operator not in labels:
+        abort(404)
+    return operator, dict(
+        user_filter_options=users,
+        owner_labels=labels,
+        selected_operator=operator,
+        selected_owner_label=labels.get(operator),
+    )
+
+
 @app.route(APP_ROOT + "/elenco_fototrappole", methods=["GET"])
 @login_required
 def elenco_fototrappole():
@@ -334,22 +356,24 @@ def elenco_fototrappole():
     elenco fototrappola
     """
     with engine.connect() as conn:
-        sql = text("SELECT * FROM fototrappole WHERE operator = :operator")
+        operator, user_context = list_user_scope(conn)
+        sql = text("SELECT * FROM fototrappole" + (" WHERE operator = :operator" if operator is not None else ""))
         fototrappole = (
-            conn.execute(sql, {"operator": session["username"]}).mappings().all()
+            conn.execute(sql, {"operator": operator} if operator is not None else {}).mappings().all()
         )
-    return render_template("elenco_fototrappole.html", fototrappole=fototrappole)
+    return render_template("elenco_fototrappole.html", fototrappole=fototrappole, **user_context)
 
 
 @app.route(APP_ROOT + "/elenco_fototrappole/export.csv", methods=["GET"])
 @login_required
 def export_fototrappole_csv():
-    """Export the current user's camera traps as an Excel-compatible CSV."""
+    """Export the camera traps visible under the same role and owner filter as the list."""
     with engine.connect() as conn:
+        operator, user_context = list_user_scope(conn)
         fototrappole = (
             conn.execute(
-                text("SELECT * FROM fototrappole WHERE operator = :operator"),
-                {"operator": session["username"]},
+                text("SELECT * FROM fototrappole" + (" WHERE operator = :operator" if operator is not None else "")),
+                {"operator": operator} if operator is not None else {},
             )
             .mappings()
             .all()
@@ -366,31 +390,33 @@ def export_fototrappole_csv():
 
     output = StringIO(newline="")
     writer = csv.writer(output, delimiter=";")
-    writer.writerow(
-        [
-            "Codice",
-            "Tipo",
-            "Nome",
-            "Data installazione",
-            "Data fine",
-            "Intersezione",
-            "Latitudine",
-            "Longitudine",
-        ]
-    )
+    headers = [
+        "Codice",
+        "Tipo",
+        "Nome",
+        "Data installazione",
+        "Data fine",
+        "Intersezione",
+        "Latitudine",
+        "Longitudine",
+    ]
+    if g.current_user["is_admin"]:
+        headers.append("Utente")
+    writer.writerow(headers)
     for foto in fototrappole:
-        writer.writerow(
-            [
-                csv_text(foto["codice"]),
-                csv_text(foto["tipo"]),
-                csv_text(f"{foto['nome'] or ''} {foto['cognome'] or ''}".strip()),
-                foto["data_inizio"],
-                foto["data_fine"],
-                csv_text(foto.get("intersezioni", foto.get("intersezione"))),
-                foto["latitudine"],
-                foto["longitudine"],
-            ]
-        )
+        values = [
+            csv_text(foto["codice"]),
+            csv_text(foto["tipo"]),
+            csv_text(f"{foto['nome'] or ''} {foto['cognome'] or ''}".strip()),
+            foto["data_inizio"],
+            foto["data_fine"],
+            csv_text(foto.get("intersezioni", foto.get("intersezione"))),
+            foto["latitudine"],
+            foto["longitudine"],
+        ]
+        if g.current_user["is_admin"]:
+            values.append(csv_text(user_context["owner_labels"].get(foto["operator"], foto["operator"])))
+        writer.writerow(values)
     return Response(
         output.getvalue().encode("utf-8-sig"),
         mimetype="text/csv",
@@ -648,8 +674,12 @@ def nuova_fototrappola():
 @app.route(APP_ROOT + "/fototrappola/<path:codice>", methods=["GET", "POST"])
 @login_required
 def edit_fototrappola(codice):
-    """Edit a camera trap owned by the current user without changing its code."""
-    identity = {"codice": codice, "operator": session["username"]}
+    """Edit an owned camera trap or let an administrator inspect another owner's data."""
+    operator = (request.args.get("operator") or session["username"]) if g.current_user["is_admin"] else session["username"]
+    view_only = operator != session["username"]
+    if request.method == "POST" and view_only:
+        abort(403)
+    identity = {"codice": codice, "operator": operator}
     with engine.connect() as conn:
         camera = (
             conn.execute(
@@ -749,9 +779,9 @@ def edit_fototrappola(codice):
         if result.rowcount == 0:
             abort(404)
         flash("Fototrappola aggiornata con successo!", "success")
-        return redirect(url_for("elenco_fototrappole"))
+        return redirect(url_for("elenco_fototrappole", operator=operator) if g.current_user["is_admin"] else url_for("elenco_fototrappole"))
 
-    return render_template("nuova_fototrappola.html", is_edit=True, form_values=values)
+    return render_template("nuova_fototrappola.html", is_edit=True, form_values=values, view_only=view_only)
 
 
 @app.route(APP_ROOT + "/reverse_geocode", methods=["GET"])
@@ -1104,20 +1134,22 @@ def save_fototrappola():
 @app.route(APP_ROOT + "/sighting_list")
 @login_required
 def sighting_list():
-    """List the user's sightings, optionally restricted to an owned camera trap."""
+    """List sightings under the current role, with optional owner and camera filters."""
     camtrap_id = request.args.get("camtrap_id")
-    parameters = {"operator": session["username"]}
     with engine.connect() as conn:
+        operator, user_context = list_user_scope(conn)
+        parameters = {"operator": operator} if operator is not None else {}
+        owner_clause = " AND s.operator = :operator" if operator is not None else ""
         if camtrap_id is not None:
             parameters["camtrap_id"] = camtrap_id
             camera_exists = conn.execute(
-                text("SELECT 1 FROM fototrappole WHERE codice = :camtrap_id AND operator = :operator"),
+                text("SELECT 1 FROM fototrappole WHERE codice = :camtrap_id" + (" AND operator = :operator" if operator is not None else "")),
                 parameters,
             ).scalar()
             if camera_exists is None:
                 abort(404)
         query = text("""
-            SELECT s.id, s.code, s.timestamp, s.camtrap_id, s.wolf_number,
+            SELECT s.id, s.code, s.operator, s.timestamp, s.camtrap_id, s.wolf_number,
                    s.scalp,
                    CASE WHEN s.latitude IS NOT NULL AND s.longitude IS NOT NULL
                         THEN s.latitude ELSE f.latitudine END AS latitude,
@@ -1130,8 +1162,8 @@ def sighting_list():
                    m.image, m.new_file_name
             FROM sighting s JOIN media m ON m.sighting_id = s.id
             LEFT JOIN fototrappole f ON f.codice = s.camtrap_id AND f.operator = s.operator
-            WHERE s.operator = :operator
-        """ + (" AND s.camtrap_id = :camtrap_id" if camtrap_id is not None else "") + """
+            WHERE 1 = 1
+        """ + owner_clause + (" AND s.camtrap_id = :camtrap_id" if camtrap_id is not None else "") + """
             ORDER BY s.timestamp DESC NULLS LAST, s.id DESC, m.id DESC
         """)
         rows = conn.execute(query, parameters).mappings().all()
@@ -1154,7 +1186,7 @@ def sighting_list():
             else None
         )
         results.append(sighting)
-    return render_template("sighting_list.html", sightings=results, camtrap_id=camtrap_id)
+    return render_template("sighting_list.html", sightings=results, camtrap_id=camtrap_id, **user_context)
 
 
 @app.route(APP_ROOT + "/upload_camtrap_video", methods=["POST"])
@@ -1286,6 +1318,11 @@ def view(sighting_id: int):
     """
     display sighting
     """
+    parameters = {"sighting_id": sighting_id}
+    owner_clause = ""
+    if not g.current_user["is_admin"]:
+        owner_clause = " AND s.operator = :operator"
+        parameters["operator"] = session["username"]
     with engine.connect() as conn:
         query = text("""
             SELECT s.id, s.code, s.operator, s.camtrap_id, s.scalp, m.image,
@@ -1300,19 +1337,23 @@ def view(sighting_id: int):
             FROM sighting s JOIN media m ON m.sighting_id = s.id
             LEFT JOIN fototrappole f ON f.codice = s.camtrap_id AND f.operator = s.operator
             WHERE s.id = :sighting_id
-        """)
-        row = conn.execute(query, {"sighting_id": sighting_id}).mappings().fetchone()
+        """ + owner_clause)
+        row = conn.execute(query, parameters).mappings().fetchone()
 
-    user = get_user(row["operator"])
+    if row is None:
+        abort(404)
+    user = get_user(row["operator"]) or {}
     return render_template(
         "view_sighting.html",
         row=row,
-        user=user["fullname"],
-        institution=user["institution"],
+        user=user.get("fullname") or row["operator"],
+        institution=user.get("institution", ""),
+        list_url=url_for("sighting_list", camtrap_id=request.args.get("camtrap_id"),
+                         operator=request.args.get("operator") if g.current_user["is_admin"] else None),
         new_file_name=row["new_file_name"]
         if row["operator"] == session["username"]
         else None,
-        data_uri=f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}",
+        data_uri=f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}" if row["image"] else None,
     )
 
 
