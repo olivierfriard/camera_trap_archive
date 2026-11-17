@@ -74,9 +74,13 @@ class MyFlask(Flask):
 app = MyFlask(__name__, static_url_path=f"{APP_ROOT.rstrip('/')}/static")
 app.secret_key = APP_SECRET_KEY  # cambia in produzione
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["TESSERACT_CMD"] = (config.get("TESSERACT_CMD") or "tesseract").strip() or "tesseract"
+app.config["TESSERACT_CMD"] = (
+    config.get("TESSERACT_CMD") or "tesseract"
+).strip() or "tesseract"
 app.config["FFMPEG_CMD"] = (config.get("FFMPEG_CMD") or "ffmpeg").strip() or "ffmpeg"
-camtrap_banner_decoder.pytesseract.pytesseract.tesseract_cmd = app.config["TESSERACT_CMD"]
+camtrap_banner_decoder.pytesseract.pytesseract.tesseract_cmd = app.config[
+    "TESSERACT_CMD"
+]
 app.config["SIGHTING_TIMEZONE"] = config.get("sighting_timezone", "Europe/Rome")
 app.config["NOMINATIM_URL"] = config.get(
     "nominatim_url", "https://nominatim.openstreetmap.org/reverse"
@@ -295,6 +299,9 @@ def nuovo_avvistamento():
 @app.route(APP_ROOT + "/upload_camtrap_video_form")
 @login_required
 def upload_camtrap_video_form():
+    """
+    display form for uploading a video from camera trap
+    """
     return render_template("upload_camtrap_video.html")
 
 
@@ -451,7 +458,9 @@ def export_fototrappole_csv():
 
 
 def video_preview_url(filename, create=False):
-    """Return a cached 640-pixel-wide preview for any uploaded video."""
+    """
+    Return a cached 640-pixel-wide preview for any uploaded video.
+    """
     filename = Path(filename).name
     source = Path(app.config["UPLOAD_FOLDER"]) / filename
     preview = source.with_name(source.name + ".preview-640.mp4")
@@ -500,7 +509,7 @@ def video_preview_url(filename, create=False):
                 "-color_range",
                 "tv",
                 "-threads",
-                "2",
+                "1",
                 "-c:a",
                 "aac",
                 "-b:a",
