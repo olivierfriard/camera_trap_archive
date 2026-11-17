@@ -119,7 +119,6 @@ def get_user(username):
         )
 
 
-# --- Login required decorator ---
 def login_required(f):
     from functools import wraps
 
@@ -140,12 +139,13 @@ def login_required(f):
 
 
 @app.route(APP_ROOT)
+@app.route(f"{APP_ROOT}/")
 @login_required
 def index():
     return render_template("index.html")
 
 
-@app.route(APP_ROOT + "/administration", methods=["GET", "POST"])
+@app.route(f"{APP_ROOT}/administration", methods=["GET", "POST"])
 @login_required
 def administration():
     """Manage accounts, checking current administrator privileges on each request."""
@@ -331,9 +331,15 @@ def list_user_scope(conn):
     """Resolve list ownership from the current database role, never from a client flag."""
     if not g.current_user["is_admin"]:
         return session["username"], {}
-    users = conn.execute(
-        text("SELECT username, fullname, is_active FROM public.users ORDER BY fullname, username")
-    ).mappings().all()
+    users = (
+        conn.execute(
+            text(
+                "SELECT username, fullname, is_active FROM public.users ORDER BY fullname, username"
+            )
+        )
+        .mappings()
+        .all()
+    )
     labels = {
         user["username"]: f"{user['fullname'] or user['username']} ({user['username']})"
         for user in users
@@ -357,11 +363,18 @@ def elenco_fototrappole():
     """
     with engine.connect() as conn:
         operator, user_context = list_user_scope(conn)
-        sql = text("SELECT * FROM fototrappole" + (" WHERE operator = :operator" if operator is not None else ""))
-        fototrappole = (
-            conn.execute(sql, {"operator": operator} if operator is not None else {}).mappings().all()
+        sql = text(
+            "SELECT * FROM fototrappole"
+            + (" WHERE operator = :operator" if operator is not None else "")
         )
-    return render_template("elenco_fototrappole.html", fototrappole=fototrappole, **user_context)
+        fototrappole = (
+            conn.execute(sql, {"operator": operator} if operator is not None else {})
+            .mappings()
+            .all()
+        )
+    return render_template(
+        "elenco_fototrappole.html", fototrappole=fototrappole, **user_context
+    )
 
 
 @app.route(APP_ROOT + "/elenco_fototrappole/export.csv", methods=["GET"])
@@ -372,7 +385,10 @@ def export_fototrappole_csv():
         operator, user_context = list_user_scope(conn)
         fototrappole = (
             conn.execute(
-                text("SELECT * FROM fototrappole" + (" WHERE operator = :operator" if operator is not None else "")),
+                text(
+                    "SELECT * FROM fototrappole"
+                    + (" WHERE operator = :operator" if operator is not None else "")
+                ),
                 {"operator": operator} if operator is not None else {},
             )
             .mappings()
@@ -415,7 +431,11 @@ def export_fototrappole_csv():
             foto["longitudine"],
         ]
         if g.current_user["is_admin"]:
-            values.append(csv_text(user_context["owner_labels"].get(foto["operator"], foto["operator"])))
+            values.append(
+                csv_text(
+                    user_context["owner_labels"].get(foto["operator"], foto["operator"])
+                )
+            )
         writer.writerow(values)
     return Response(
         output.getvalue().encode("utf-8-sig"),
@@ -552,7 +572,8 @@ def video_conversion_status(filename):
     if "archive_restore_csrf_token" not in session:
         session["archive_restore_csrf_token"] = secrets.token_urlsafe(32)
     download_available = (
-        job["status"] == "completed" and bool(job["output_filename"])
+        job["status"] == "completed"
+        and bool(job["output_filename"])
         and (Path(app.config["UPLOAD_FOLDER"]) / job["output_filename"]).is_file()
     )
     return jsonify(
@@ -561,8 +582,10 @@ def video_conversion_status(filename):
         saved=bool(job.get("saved")),
         restore_status=job.get("restore_status"),
         restore_url=url_for("restore_archive_video", filename=filename)
-        if not download_available and job["status"] == "completed"
-        and job.get("transfer_status") == "completed" and job.get("saved")
+        if not download_available
+        and job["status"] == "completed"
+        and job.get("transfer_status") == "completed"
+        and job.get("saved")
         else None,
         restore_csrf_token=session["archive_restore_csrf_token"],
         download_url=url_for("uploaded_file", filename=job["output_filename"])
@@ -583,7 +606,9 @@ def restore_archive_video(filename):
     from archive_download import enqueue_download
 
     with engine.begin() as conn:
-        job = conn.execute(text("""
+        job = (
+            conn.execute(
+                text("""
             SELECT t.output_filename
             FROM video_conversions v
             JOIN archive_transfers t ON t.source_filename = v.source_filename
@@ -595,11 +620,18 @@ def restore_archive_video(filename):
                     WHERE m.new_file_name = v.source_filename AND s.operator = v.operator
                 )
             FOR UPDATE OF v
-        """), {"filename": filename, "operator": session["username"]}).mappings().fetchone()
+        """),
+                {"filename": filename, "operator": session["username"]},
+            )
+            .mappings()
+            .fetchone()
+        )
         if job is None:
             abort(404)
         output_filename = job["output_filename"]
-        if Path(output_filename).name != output_filename or not output_filename.endswith(".compressed.mp4"):
+        if Path(
+            output_filename
+        ).name != output_filename or not output_filename.endswith(".compressed.mp4"):
             abort(400)
         if (Path(app.config["UPLOAD_FOLDER"]) / output_filename).is_file():
             return jsonify(status="completed")
@@ -675,7 +707,11 @@ def nuova_fototrappola():
 @login_required
 def edit_fototrappola(codice):
     """Edit an owned camera trap or let an administrator inspect another owner's data."""
-    operator = (request.args.get("operator") or session["username"]) if g.current_user["is_admin"] else session["username"]
+    operator = (
+        (request.args.get("operator") or session["username"])
+        if g.current_user["is_admin"]
+        else session["username"]
+    )
     view_only = operator != session["username"]
     if request.method == "POST" and view_only:
         abort(403)
@@ -779,9 +815,15 @@ def edit_fototrappola(codice):
         if result.rowcount == 0:
             abort(404)
         flash("Fototrappola aggiornata con successo!", "success")
-        return redirect(url_for("elenco_fototrappole", operator=operator) if g.current_user["is_admin"] else url_for("elenco_fototrappole"))
+        return redirect(
+            url_for("elenco_fototrappole", operator=operator)
+            if g.current_user["is_admin"]
+            else url_for("elenco_fototrappole")
+        )
 
-    return render_template("nuova_fototrappola.html", is_edit=True, form_values=values, view_only=view_only)
+    return render_template(
+        "nuova_fototrappola.html", is_edit=True, form_values=values, view_only=view_only
+    )
 
 
 @app.route(APP_ROOT + "/reverse_geocode", methods=["GET"])
@@ -1143,12 +1185,16 @@ def sighting_list():
         if camtrap_id is not None:
             parameters["camtrap_id"] = camtrap_id
             camera_exists = conn.execute(
-                text("SELECT 1 FROM fototrappole WHERE codice = :camtrap_id" + (" AND operator = :operator" if operator is not None else "")),
+                text(
+                    "SELECT 1 FROM fototrappole WHERE codice = :camtrap_id"
+                    + (" AND operator = :operator" if operator is not None else "")
+                ),
                 parameters,
             ).scalar()
             if camera_exists is None:
                 abort(404)
-        query = text("""
+        query = text(
+            """
             SELECT s.id, s.code, s.operator, s.timestamp, s.camtrap_id, s.wolf_number,
                    s.scalp,
                    CASE WHEN s.latitude IS NOT NULL AND s.longitude IS NOT NULL
@@ -1163,9 +1209,13 @@ def sighting_list():
             FROM sighting s JOIN media m ON m.sighting_id = s.id
             LEFT JOIN fototrappole f ON f.codice = s.camtrap_id AND f.operator = s.operator
             WHERE 1 = 1
-        """ + owner_clause + (" AND s.camtrap_id = :camtrap_id" if camtrap_id is not None else "") + """
+        """
+            + owner_clause
+            + (" AND s.camtrap_id = :camtrap_id" if camtrap_id is not None else "")
+            + """
             ORDER BY s.timestamp DESC NULLS LAST, s.id DESC, m.id DESC
-        """)
+        """
+        )
         rows = conn.execute(query, parameters).mappings().all()
     results = []
     for row in rows:
@@ -1186,7 +1236,9 @@ def sighting_list():
             else None
         )
         results.append(sighting)
-    return render_template("sighting_list.html", sightings=results, camtrap_id=camtrap_id, **user_context)
+    return render_template(
+        "sighting_list.html", sightings=results, camtrap_id=camtrap_id, **user_context
+    )
 
 
 @app.route(APP_ROOT + "/upload_camtrap_video", methods=["POST"])
@@ -1324,7 +1376,8 @@ def view(sighting_id: int):
         owner_clause = " AND s.operator = :operator"
         parameters["operator"] = session["username"]
     with engine.connect() as conn:
-        query = text("""
+        query = text(
+            """
             SELECT s.id, s.code, s.operator, s.camtrap_id, s.scalp, m.image,
                    s.wolf_number, s.notes, m.new_file_name,
                    CASE WHEN s.latitude IS NOT NULL AND s.longitude IS NOT NULL
@@ -1337,7 +1390,9 @@ def view(sighting_id: int):
             FROM sighting s JOIN media m ON m.sighting_id = s.id
             LEFT JOIN fototrappole f ON f.codice = s.camtrap_id AND f.operator = s.operator
             WHERE s.id = :sighting_id
-        """ + owner_clause)
+        """
+            + owner_clause
+        )
         row = conn.execute(query, parameters).mappings().fetchone()
 
     if row is None:
@@ -1348,12 +1403,19 @@ def view(sighting_id: int):
         row=row,
         user=user.get("fullname") or row["operator"],
         institution=user.get("institution", ""),
-        list_url=url_for("sighting_list", camtrap_id=request.args.get("camtrap_id"),
-                         operator=request.args.get("operator") if g.current_user["is_admin"] else None),
+        list_url=url_for(
+            "sighting_list",
+            camtrap_id=request.args.get("camtrap_id"),
+            operator=request.args.get("operator")
+            if g.current_user["is_admin"]
+            else None,
+        ),
         new_file_name=row["new_file_name"]
         if row["operator"] == session["username"]
         else None,
-        data_uri=f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}" if row["image"] else None,
+        data_uri=f"data:image/jpeg;base64,{base64.b64encode(row['image']).decode('ascii')}"
+        if row["image"]
+        else None,
     )
 
 
