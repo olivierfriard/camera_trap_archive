@@ -226,13 +226,19 @@ class SightingListTests(unittest.TestCase):
     def test_camera_selection_scopes_coordinates_to_logged_in_user(self):
         with self.database.begin() as conn:
             conn.execute(text("INSERT INTO fototrappole VALUES ('PRIVATE', 'someone-else', 66, 77)"))
-        url = "/get_fototrappola_data"
-        self.assertEqual(self.main.app.test_client().get(url + "?camtrap_id=FT01").status_code, 302)
-        self.assertEqual(self.client.get(url).data, b"")
-        self.assertEqual(self.client.get(url + "?camtrap_id=PRIVATE").status_code, 404)
-        response = self.client.get(url + "?camtrap_id=FT01&operator=someone-else")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('data-latitude="0.0" data-longitude="7.6"', response.get_data(as_text=True))
+        for url in ("/get_fototrappola_data", self.main.APP_ROOT + "/get_fototrappola_data"):
+            with self.subTest(url=url):
+                self.assertEqual(self.main.app.test_client().get(url + "?camtrap_id=FT01").status_code, 302)
+                self.assertEqual(self.client.get(url).data, b"")
+                self.assertEqual(self.client.get(url + "?camtrap_id=PRIVATE").status_code, 404)
+                response = self.client.get(url + "?camtrap_id=FT01&operator=someone-else")
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('data-latitude="0.0" data-longitude="7.6"', response.get_data(as_text=True))
+        with self.main.app.test_request_context():
+            url = self.main.url_for("get_fototrappola_data")
+            self.assertEqual(url, self.main.APP_ROOT + "/get_fototrappola_data")
+            html = self.main.render_template("upload_camtrap_sighting.html", fototrappole=[])
+            self.assertIn(f'hx-get="{url}"', html)
 
     def test_empty_list_and_authentication(self):
         self.assertIn("Nessun avvistamento registrato", self.get_list())

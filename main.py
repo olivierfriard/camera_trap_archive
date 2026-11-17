@@ -683,7 +683,8 @@ def extract_frame(video_path, time_sec):
     return None
 
 
-@app.route("/get_fototrappola_data", methods=["GET"])
+@app.route("/get_fototrappola_data", methods=["GET"], endpoint="get_fototrappola_data_legacy")
+@app.route(APP_ROOT + "/get_fototrappola_data", methods=["GET"])
 @login_required
 def get_fototrappola_data():
     camtrap_id = request.args.get("camtrap_id")

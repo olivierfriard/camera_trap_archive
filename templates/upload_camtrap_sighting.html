@@ -103,7 +103,7 @@
                         <div class="control">
                             <div class="select">
 
-                                <select name="camtrap_id" hx-get="/get_fototrappola_data" hx-trigger="change"
+                                <select name="camtrap_id" hx-get="{{ url_for('get_fototrappola_data') }}" hx-trigger="change"
                                     hx-sync="this:replace" hx-target="#details" hx-include="this">
                                     <option value="">-- scegli una fototrappola --</option>
                                     {% for foto in fototrappole %}
