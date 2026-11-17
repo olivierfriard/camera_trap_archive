@@ -36,14 +36,14 @@ def enqueue_conversion(conn, filename, operator, source_md5):
     })
 
 
-def convert_video(source, output, timeout=3600):
+def convert_video(source, output, timeout=3600, ffmpeg_binary="ffmpeg"):
     """Use easy_video_compressor's H.264 settings without reducing resolution."""
     temporary = None
     try:
         with NamedTemporaryFile(dir=output.parent, suffix=".mp4", delete=False) as file:
             temporary = Path(file.name)
         subprocess.run([
-            "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
+            ffmpeg_binary, "-nostdin", "-hide_banner", "-loglevel", "error",
             "-i", str(source),
             "-map_metadata", "0", "-map_metadata:s", "0:s", "-map_chapters", "0",
             "-c:v", "libx264", "-preset", "medium", "-crf", "24",
@@ -58,7 +58,7 @@ def convert_video(source, output, timeout=3600):
             temporary.unlink(missing_ok=True)
 
 
-def process_one(engine, upload_folder, timeout=3600):
+def process_one(engine, upload_folder, timeout=3600, ffmpeg_binary="ffmpeg"):
     """Claim one due job, release its transaction, then publish its result atomically."""
     with engine.begin() as conn:
         job = conn.execute(text("""
@@ -87,7 +87,7 @@ def process_one(engine, upload_folder, timeout=3600):
             raise ValueError("Source video no longer matches its upload hash")
         # A previously published file can survive a crash before the database commit.
         if not output.is_file() or output.stat().st_mtime < source.stat().st_mtime or output.stat().st_size == 0:
-            convert_video(source, output, timeout=timeout)
+            convert_video(source, output, timeout=timeout, ffmpeg_binary=ffmpeg_binary)
         output_md5 = file_md5(output)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         details = error.stderr.decode("utf-8", errors="replace") if isinstance(error, subprocess.CalledProcessError) and error.stderr else str(error)
@@ -122,7 +122,8 @@ def process_one(engine, upload_folder, timeout=3600):
 
 
 def run_worker(engine, upload_folder, watch=False, timeout=3600,
-               archive_storage=None, rclone_binary="rclone", archive_timeout=3600):
+               archive_storage=None, rclone_binary="rclone", archive_timeout=3600,
+               ffmpeg_binary="ffmpeg"):
     """Run at most one worker per database, recovering interrupted conversions."""
     with engine.connect() as guard:
         acquired = guard.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": WORKER_LOCK}).scalar()
@@ -148,7 +149,7 @@ def run_worker(engine, upload_folder, watch=False, timeout=3600,
                 """), {"maximum": MAX_ATTEMPTS})
             while True:
                 downloaded = process_one_download(engine, upload_folder, rclone_binary, archive_timeout)
-                converted = process_one(engine, upload_folder, timeout)
+                converted = process_one(engine, upload_folder, timeout, ffmpeg_binary=ffmpeg_binary)
                 transferred = False
                 if archive_storage:
                     with engine.begin() as conn:

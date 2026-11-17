@@ -74,6 +74,9 @@ class MyFlask(Flask):
 app = MyFlask(__name__, static_url_path=f"{APP_ROOT.rstrip('/')}/static")
 app.secret_key = APP_SECRET_KEY  # cambia in produzione
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["TESSERACT_CMD"] = (config.get("TESSERACT_CMD") or "tesseract").strip() or "tesseract"
+app.config["FFMPEG_CMD"] = (config.get("FFMPEG_CMD") or "ffmpeg").strip() or "ffmpeg"
+camtrap_banner_decoder.pytesseract.pytesseract.tesseract_cmd = app.config["TESSERACT_CMD"]
 app.config["SIGHTING_TIMEZONE"] = config.get("sighting_timezone", "Europe/Rome")
 app.config["NOMINATIM_URL"] = config.get(
     "nominatim_url", "https://nominatim.openstreetmap.org/reverse"
@@ -472,7 +475,7 @@ def video_preview_url(filename, create=False):
             temporary = Path(output.name)
         subprocess.run(
             [
-                "ffmpeg",
+                app.config["FFMPEG_CMD"],
                 "-nostdin",
                 "-hide_banner",
                 "-loglevel",

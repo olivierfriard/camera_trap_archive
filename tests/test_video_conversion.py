@@ -30,6 +30,7 @@ class ArchiveConversionTests(unittest.TestCase):
         target = self.folder / "original.avi.compressed.mp4"
 
         def encode(command, **options):
+            self.assertEqual(command[0], "/opt/media tools/ffmpeg")
             self.assertEqual(options["timeout"], 3600)
             for option, value in (
                 ("-c:v", "libx264"), ("-preset", "medium"), ("-crf", "24"),
@@ -42,7 +43,7 @@ class ArchiveConversionTests(unittest.TestCase):
             Path(command[-1]).write_bytes(b"complete mp4")
 
         with patch("video_conversion.subprocess.run", side_effect=encode):
-            video_conversion.convert_video(source, target)
+            video_conversion.convert_video(source, target, ffmpeg_binary="/opt/media tools/ffmpeg")
         self.assertEqual(source.read_bytes(), b"original")
         self.assertEqual(target.read_bytes(), b"complete mp4")
         self.assertEqual(set(self.folder.iterdir()), {source, target})

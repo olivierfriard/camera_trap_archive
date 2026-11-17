@@ -67,6 +67,19 @@ class VideoPreviewTests(unittest.TestCase):
             self.assertIsNone(self.main.video_preview_url("sample.avi"))
             run.assert_not_called()
 
+    def test_preview_uses_configured_ffmpeg_path(self):
+        (self.folder / "sample.avi").write_bytes(b"original")
+
+        def encode(command, **options):
+            self.assertEqual(command[0], "/opt/media tools/ffmpeg")
+            Path(command[-1]).write_bytes(b"preview")
+
+        with (
+            patch.dict(self.main.app.config, FFMPEG_CMD="/opt/media tools/ffmpeg"),
+            patch.object(self.main.subprocess, "run", side_effect=encode),
+        ):
+            self.assertIsNotNone(self.main.video_preview_url("sample.avi", create=True))
+
     def test_cached_preview_is_available_after_original_cleanup(self):
         preview = self.folder / "sample.avi.preview-640.mp4"
         preview.write_bytes(b"retained preview")

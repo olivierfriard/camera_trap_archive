@@ -1,5 +1,18 @@
 # Video conversions
 
+Set executable paths in the application's `.env`, adapting them to each server:
+
+```dotenv
+TESSERACT_CMD=/usr/bin/tesseract
+FFMPEG_CMD=/usr/bin/ffmpeg
+```
+
+`TESSERACT_CMD` configures pytesseract for banner OCR in the Flask application.
+`FFMPEG_CMD` is used for synchronous previews and asynchronous archive conversion.
+An absent or blank setting falls back to `tesseract` or `ffmpeg` on PATH. Executable
+paths containing spaces are supported. Restart Flask and any existing conversion
+worker after changing these settings; a new worker reads `.env` when it starts.
+
 Run the one-time migration before restarting the Flask application:
 
 ```bash

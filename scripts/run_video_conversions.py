@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--watch", action="store_true")
     args = parser.parse_args()
     config = dotenv_values(ROOT / ".env")
+    ffmpeg_binary = (config.get("FFMPEG_CMD") or "ffmpeg").strip() or "ffmpeg"
     archive_storage = normalize_archive_storage(config["archive_storage"]) if config.get("archive_storage") else None
     rclone_binary = config.get("rclone_binary") or shutil.which("rclone") or str(Path.home() / ".local/bin/rclone")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -40,6 +41,7 @@ def main():
             timeout=int(config.get("conversion_timeout_seconds", "3600")),
             archive_storage=archive_storage, rclone_binary=rclone_binary,
             archive_timeout=int(config.get("archive_timeout_seconds", "3600")),
+            ffmpeg_binary=ffmpeg_binary,
         )
     except KeyboardInterrupt:
         pass
