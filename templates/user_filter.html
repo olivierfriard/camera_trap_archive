@@ -1,0 +1,17 @@
+{% if session.get('is_admin') %}
+<form method="get" class="field is-grouped is-grouped-multiline mb-5">
+    {% if camtrap_id %}<input type="hidden" name="camtrap_id" value="{{ camtrap_id }}" />{% endif %}
+    <div class="control">
+        <label class="label" for="operatorFilter">Utente</label>
+        <div class="select">
+            <select id="operatorFilter" name="operator">
+                <option value="" {% if not selected_operator %}selected{% endif %}>Tutti</option>
+                {% for account in user_filter_options %}
+                <option value="{{ account.username }}" {% if selected_operator == account.username %}selected{% endif %}>{{ owner_labels[account.username] }}{% if not account.is_active %} — disattivato{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="control is-align-self-flex-end"><button class="button is-link" type="submit">Filtra</button></div>
+</form>
+{% endif %}
