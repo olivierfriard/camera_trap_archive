@@ -1314,14 +1314,6 @@ def upload_camtrap_video():
     save_path = Path(app.config["UPLOAD_FOLDER"]) / new_file_name
     video.save(save_path)
 
-    with engine.begin() as conn:
-        enqueue_conversion(
-            conn, str(new_file_name), session["username"], file_content_md5
-        )
-    start_conversion_worker()
-    video_url = video_preview_url(new_file_name, create=True)
-    flash("Video caricato con successo!", "success")
-
     # check date time
     data = camtrap_banner_decoder.extract_date_time(
         save_path,
@@ -1330,6 +1322,14 @@ def upload_camtrap_video():
         ),
     )
     app.logger.info(f"{data=}")
+
+    with engine.begin() as conn:
+        enqueue_conversion(
+            conn, str(new_file_name), session["username"], file_content_md5
+        )
+    start_conversion_worker()
+    video_url = video_preview_url(new_file_name, create=True)
+    flash("Video caricato con successo!", "success")
 
     time_ = ""
 
