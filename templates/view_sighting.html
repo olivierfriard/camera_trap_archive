@@ -11,6 +11,7 @@
         </h1>
         <h2 class="title is-4 has-text-centered">Avvistamento</h2>
         <a class="button is-light" href="{{ list_url }}">Torna all'elenco avvistamenti</a>
+        <a class="button is-link" href="{{ url_for('edit_sighting', sighting_id=row.id, operator=request.args.get('operator') if session.get('is_admin') else none, camtrap_id=request.args.get('camtrap_id')) }}">Modifica</a>
 
         <br><br>
 

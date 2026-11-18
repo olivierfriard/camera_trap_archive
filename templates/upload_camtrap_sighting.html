@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Avistamento fototrappola{% endblock %}
+{% block title %}{{ 'Modifica avvistamento' if is_edit else 'Avistamento fototrappola' }}{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -26,7 +26,7 @@
 {% block content %}
 <section class="section">
     <div class="container">
-        <h1 class="title is-3">Avistamento fototrappola</h1>
+        <h1 class="title is-3">{{ 'Modifica avvistamento' if is_edit else 'Avistamento fototrappola' }}</h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -49,14 +49,16 @@
         </div>
         {% endif %}
         {% endwith %}
-        {% if video_url or new_file_name %}
+        {% if is_edit or video_url or new_file_name %}
         <div class="box mt-5">
             {% if video_url %}
             <video id="video_camtrap" src="{{ video_url }}" width="720" preload="metadata" controls></video>
             {% else %}
             <p class="notification is-warning">Anteprima non disponibile. Puoi comunque compilare e salvare i dati.</p>
-            <a class="button is-small" href="{{ url_for('uploaded_file', filename=new_file_name) }}" download>Scarica il
+            {% if is_edit and data_uri %}<img src="{{ data_uri }}" alt="Immagine dell'avvistamento" />{% endif %}
+            {% if not is_edit %}<a class="button is-small" href="{{ url_for('uploaded_file', filename=new_file_name) }}" download>Scarica il
                 video originale</a>
+            {% endif %}
             {% endif %}
             <div class="columns mt-3">
                 <div class="column is-half">
@@ -85,10 +87,14 @@
 
         {# {% include "archive_status.html" %} #}
 
-        <form id="uploadForm" method="post" action="{{ url_for('save_sighting') }}" enctype="multipart/form-data">
+        <form id="uploadForm" method="post" action="{{ edit_url if is_edit else url_for('save_sighting') }}" enctype="multipart/form-data">
+            {% if is_edit %}
+            <input type="hidden" name="csrf_token" value="{{ session['sighting_csrf_token'] }}" />
+            {% else %}
             <input type="hidden" name="original_file_name" value="{{ original_file_name }}" />
             <input type="hidden" name="new_file_name" value="{{ new_file_name }}" />
             <input type="hidden" name="file_content_md5" value="{{ file_content_md5 }}" />
+            {% endif %}
             <div class="field">
                 <label class="label">Operatore</label>
                 <div class="control">
@@ -103,9 +109,12 @@
                         <div class="control">
                             <div class="select">
 
-                                <select name="camtrap_id" hx-get="{{ url_for('get_fototrappola_data') }}" hx-trigger="change"
+                                <select name="camtrap_id" hx-get="{{ camera_details_url|default(url_for('get_fototrappola_data'), true) }}" hx-trigger="change"
                                     hx-sync="this:replace" hx-target="#details" hx-include="this">
                                     <option value="">-- scegli una fototrappola --</option>
+                                    {% if is_edit and camtrap_id and not fototrappola %}
+                                    <option value="{{ camtrap_id }}" selected>{{ camtrap_id }} — non disponibile</option>
+                                    {% endif %}
                                     {% for foto in fototrappole %}
                                     <option value="{{ foto.codice }}" {% if camtrap_id==foto.codice %}selected{%endif%}>
                                         {{ foto.codice }}</option>
@@ -151,6 +160,9 @@
                             <div class="select">
                                 <select id="scalp" name="scalp" required>
                                     <option value="">Seleziona un codice</option>
+                                    {% if is_edit and original_scalp and original_scalp not in ['C1', 'C3'] %}
+                                    <option value="{{ original_scalp }}" {% if scalp == original_scalp %}selected{% endif %}>{{ original_scalp }}</option>
+                                    {% endif %}
                                     <option value="C1" {% if scalp=="C1" %}selected{%endif%}>C1</option>
                                     <option value="C3" {% if scalp=="C3" %}selected{%endif%}>C3</option>
                                 </select>
@@ -163,17 +175,17 @@
             <div class="field">
                 <label class="label">Note</label>
                 <div class="control">
-                    <textarea name="note" class="textarea" placeholder="Digitate le vostre note...">
-                        {{ notes }}</textarea>
+                    <textarea name="note" class="textarea" placeholder="Digitate le vostre note...">{{ notes }}</textarea>
                 </div>
             </div>
 
             <div class="field is-grouped">
                 <div class="control">
                     <button class="button is-primary" type="submit">
-                        Salva dati
+                        {{ 'Salva modifiche' if is_edit else 'Salva dati' }}
                     </button>
                 </div>
+                {% if is_edit %}<div class="control"><a class="button is-light" href="{{ cancel_url }}">Annulla</a></div>{% endif %}
             </div>
         </form>
 

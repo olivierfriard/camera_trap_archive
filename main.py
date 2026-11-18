@@ -683,6 +683,21 @@ def extract_frame(video_path, time_sec):
     return None
 
 
+def get_editable_sighting(conn, sighting_id):
+    """Load a sighting only for its owner or a current administrator."""
+    parameters = {"sighting_id": sighting_id}
+    owner_clause = ""
+    if not g.current_user["is_admin"]:
+        owner_clause = " AND operator = :operator"
+        parameters["operator"] = session["username"]
+    row = conn.execute(
+        text("SELECT * FROM sighting WHERE id = :sighting_id" + owner_clause), parameters
+    ).mappings().fetchone()
+    if row is None:
+        abort(404)
+    return row
+
+
 @app.route("/get_fototrappola_data", methods=["GET"], endpoint="get_fototrappola_data_legacy")
 @app.route(APP_ROOT + "/get_fototrappola_data", methods=["GET"])
 @login_required
@@ -691,12 +706,18 @@ def get_fototrappola_data():
     if not camtrap_id:
         return ""
     with engine.connect() as conn:
+        operator = session["username"]
+        if "sighting_id" in request.args:
+            sighting_id = request.args.get("sighting_id", type=int)
+            if sighting_id is None:
+                abort(400)
+            operator = get_editable_sighting(conn, sighting_id)["operator"]
         fototrappola = (
             conn.execute(
                 text(
                     "SELECT * FROM fototrappole WHERE codice = :codice AND operator = :operator"
                 ),
-                {"codice": camtrap_id, "operator": session["username"]},
+                {"codice": camtrap_id, "operator": operator},
             )
             .mappings()
             .fetchone()
@@ -1377,6 +1398,144 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
+@app.route(APP_ROOT + "/edit_sighting/<int:sighting_id>", methods=["GET", "POST"])
+@login_required
+def edit_sighting(sighting_id):
+    """Update sighting metadata without changing ownership, media or archive jobs."""
+    if "sighting_csrf_token" not in session:
+        session["sighting_csrf_token"] = secrets.token_urlsafe(32)
+    if request.method == "POST" and not secrets.compare_digest(
+        session["sighting_csrf_token"].encode(), request.form.get("csrf_token", "").encode()
+    ):
+        abort(400)
+    context_args = dict(
+        operator=request.args.get("operator") if g.current_user["is_admin"] else None,
+        camtrap_id=request.args.get("camtrap_id"),
+    )
+    view_url = url_for("view", sighting_id=sighting_id, **context_args)
+    response_status = 200
+    with engine.connect() as conn:
+        row = get_editable_sighting(conn, sighting_id)
+        owner = row["operator"]
+        cameras = conn.execute(
+            text("SELECT * FROM fototrappole WHERE operator = :operator ORDER BY codice"),
+            {"operator": owner},
+        ).mappings().all()
+        camera_by_code = {camera["codice"]: camera for camera in cameras}
+        camera = camera_by_code.get(row["camtrap_id"])
+        timestamp = row["timestamp"]
+        local_time = timestamp.astimezone(ZoneInfo(app.config["SIGHTING_TIMEZONE"])) if timestamp else None
+        latitude, longitude = row["latitude"], row["longitude"]
+        if (latitude is None or longitude is None) and camera is not None:
+            latitude, longitude = camera["latitudine"], camera["longitudine"]
+        values = dict(
+            code=row["code"] or "", camtrap_id=row["camtrap_id"] or "",
+            wolf_number=row["wolf_number"] if row["wolf_number"] is not None else "",
+            scalp=row["scalp"] or "", notes=row["notes"] or "",
+            latitude=latitude, longitude=longitude,
+            date=local_time.strftime("%Y-%m-%d") if local_time else "",
+            time_=local_time.strftime("%H:%M:%S") if local_time else "",
+        )
+        if request.method == "POST":
+            values.update({key: request.form.get(key, "").strip() for key in (
+                "code", "camtrap_id", "wolf_number", "scalp", "latitude", "longitude", "date", "time_",
+            )})
+            values["notes"] = request.form.get("note", "")
+            camera = camera_by_code.get(values["camtrap_id"])
+            errors = []
+            if not values["code"]:
+                errors.append("Il codice dell'avvistamento è obbligatorio.")
+            elif conn.execute(
+                text("SELECT COUNT(*) FROM sighting WHERE code = :code AND id <> :sighting_id"),
+                {"code": values["code"], "sighting_id": sighting_id},
+            ).scalar():
+                errors.append("Il codice dell'avvistamento è già presente nel database.")
+            if values["camtrap_id"] and camera is None:
+                errors.append("La fototrappola selezionata non appartiene al proprietario dell'avvistamento.")
+            try:
+                wolf_number = int(values["wolf_number"])
+                if not 0 <= wolf_number <= 120:
+                    raise ValueError
+            except ValueError:
+                errors.append("Il numero di lupi deve essere un intero tra 0 e 120.")
+            if not values["scalp"] or values["scalp"] not in {"C1", "C3", row["scalp"]}:
+                errors.append("Seleziona un valore SCALP valido.")
+            timestamp = None
+            if values["date"] or values["time_"]:
+                try:
+                    for format_ in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+                        try:
+                            timestamp = datetime.strptime(f"{values['date']} {values['time_']}", format_)
+                            break
+                        except ValueError:
+                            continue
+                    else:
+                        raise ValueError
+                    timestamp = timestamp.replace(tzinfo=ZoneInfo(app.config["SIGHTING_TIMEZONE"]))
+                    roundtrip = timestamp.astimezone(timezone.utc).astimezone(timestamp.tzinfo)
+                    if roundtrip.replace(tzinfo=None) != timestamp.replace(tzinfo=None):
+                        raise ValueError
+                except ValueError:
+                    errors.append("Data o ora non valide. Usa AAAA-MM-GG e HH:MM:SS (o HH:MM), nell'ora locale indicata.")
+            latitude = longitude = None
+            if values["latitude"] or values["longitude"]:
+                try:
+                    latitude, longitude = float(values["latitude"]), float(values["longitude"])
+                    if not (math.isfinite(latitude) and math.isfinite(longitude)
+                            and -90 <= latitude <= 90 and -180 <= longitude <= 180):
+                        raise ValueError
+                except (ValueError, OverflowError):
+                    errors.append("Coordinate non valide. Compila entrambe le coordinate oppure lascia entrambe vuote.")
+            if errors:
+                for error in errors:
+                    flash(error, "danger")
+                response_status = 400
+            else:
+                try:
+                    result = conn.execute(text("""
+                        UPDATE sighting SET code = :code, timestamp = :timestamp,
+                            camtrap_id = :camtrap_id, wolf_number = :wolf_number,
+                            scalp = :scalp, notes = :notes, latitude = :latitude, longitude = :longitude
+                        WHERE id = :sighting_id AND operator = :operator
+                    """), dict(
+                        sighting_id=sighting_id, operator=owner, code=values["code"],
+                        timestamp=timestamp, camtrap_id=values["camtrap_id"] or None,
+                        wolf_number=wolf_number, scalp=values["scalp"], notes=values["notes"] or None,
+                        latitude=latitude, longitude=longitude,
+                    ))
+                    conn.commit()
+                except IntegrityError:
+                    conn.rollback()
+                    flash("Impossibile salvare: verifica il codice e i dati inseriti.", "danger")
+                    response_status = 400
+                except Exception:
+                    conn.rollback()
+                    app.logger.exception("Failed to update sighting %s", sighting_id)
+                    flash("Errore durante il salvataggio dell'avvistamento. Le modifiche non sono state salvate.", "danger")
+                    response_status = 500
+                else:
+                    if result.rowcount == 0:
+                        abort(404)
+                    flash("Avvistamento aggiornato con successo!", "success")
+                    return redirect(view_url)
+        media = conn.execute(
+            text("SELECT new_file_name, image FROM media WHERE sighting_id = :sighting_id ORDER BY id LIMIT 1"),
+            {"sighting_id": sighting_id},
+        ).mappings().fetchone()
+    filename = media["new_file_name"] if media else None
+    account = get_user(owner) or {}
+    return render_template(
+        "upload_camtrap_sighting.html", is_edit=True, sighting_id=sighting_id,
+        edit_url=url_for("edit_sighting", sighting_id=sighting_id, **context_args), cancel_url=view_url,
+        camera_details_url=url_for("get_fototrappola_data", sighting_id=sighting_id),
+        operator=account.get("fullname") or owner, fototrappole=cameras, fototrappola=camera,
+        new_file_name=filename, video_url=video_preview_url(filename) if filename else None,
+        data_uri=f"data:image/jpeg;base64,{base64.b64encode(media['image']).decode('ascii')}"
+        if media and media["image"] else None,
+        original_scalp=row["scalp"], **values,
+    ), response_status
+
+
 @app.route(APP_ROOT + "/view/<int:sighting_id>")
 @login_required
 def view(sighting_id: int):
@@ -1400,7 +1559,7 @@ def view(sighting_id: int):
                    CASE WHEN (s.latitude IS NULL OR s.longitude IS NULL)
                              AND (f.latitudine IS NOT NULL OR f.longitudine IS NOT NULL)
                         THEN 'fototrappola' ELSE '' END AS coordinate_source
-            FROM sighting s JOIN media m ON m.sighting_id = s.id
+            FROM sighting s LEFT JOIN media m ON m.sighting_id = s.id
             LEFT JOIN fototrappole f ON f.codice = s.camtrap_id AND f.operator = s.operator
             WHERE s.id = :sighting_id
         """
