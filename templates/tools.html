@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Tools{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="container">
+        <h1 class="title">Tools</h1>
+        <div class="box">
+            <h2 class="title is-4">Easy Video Compressor</h2>
+            <p class="mb-4">Programma per Windows per comprimere i file video in formato MP4.</p>
+            <a class="button is-primary" href="{{ url_for('static', filename='easy_video_compressor.exe') }}" download="easy_video_compressor.exe">Scarica Easy Video Compressor per Windows</a>
+        </div>
+    </div>
+</section>
+{% endblock %}
