@@ -1573,6 +1573,7 @@ def view(sighting_id: int):
     return render_template(
         "view_sighting.html",
         row=row,
+        preview_url=video_preview_url(row["new_file_name"]) if row["new_file_name"] else None,
         user=user.get("fullname") or row["operator"],
         institution=user.get("institution", ""),
         list_url=url_for(

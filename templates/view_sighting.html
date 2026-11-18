@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% from "fototrappola_coordinates.html" import coordinates, coordinate_scripts %}
 
+{% block head %}
+<style>
+    .sighting-media { display: block; width: 100%; max-height: 360px; object-fit: contain; border-radius: 6px; }
+    video.sighting-media { background: #111; }
+</style>
+{% endblock %}
 
 {% block content %}
 <section class="section">
@@ -35,7 +41,15 @@
 
         <br>
         <br>
-        {% if data_uri %}<img src="{{ data_uri }}" alt="inline image">{% else %}<p>Immagine non disponibile.</p>{% endif %}
+        {% if preview_url %}
+        <video class="sighting-media" src="{{ preview_url }}" controls playsinline preload="none" width="640"
+            {% if data_uri %}poster="{{ data_uri }}"{% endif %}>
+            Il browser non supporta la riproduzione video.
+        </video>
+        {% else %}
+        {% if data_uri %}<img class="sighting-media" src="{{ data_uri }}" alt="Immagine dell'avvistamento {{ row.code }}">{% else %}<p>Immagine non disponibile.</p>{% endif %}
+        <p class="help has-text-warning-dark mt-2">Anteprima video non disponibile.</p>
+        {% endif %}
 
         {% include "archive_status.html" %}
 

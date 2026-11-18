@@ -135,6 +135,10 @@ class AdminVisibilityTests(unittest.TestCase):
             self.assertIn('disattivato', html)
         self.assertEqual(sightings.count('<article'), 4)
         self.assertIn('alice.mp4.preview-640.mp4', sightings)
+        detail = self.html('/view/1')
+        self.assertIn('<video class="sighting-media"', detail)
+        self.assertIn('alice.mp4.preview-640.mp4', detail)
+        self.assertIn('controls playsinline preload="none"', detail)
         self.main.start_conversion_worker.assert_not_called()
 
     def test_owner_filter_applies_to_both_lists_and_csv(self):

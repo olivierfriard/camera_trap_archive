@@ -92,11 +92,11 @@ class SightingListTests(unittest.TestCase):
     def test_missing_preview_uses_original_database_image(self):
         image = b"stored JPEG frame"
         self.add_sighting(image=image)
-        html = self.get_list()
-        self.assertIn('<img class="sighting-media"', html)
-        self.assertIn("data:image/jpeg;base64," + base64.b64encode(image).decode(), html)
-        self.assertIn("Anteprima video non disponibile", html)
-        self.assertNotIn('<video class="sighting-media"', html)
+        for html in (self.get_list(), self.client.get(self.main.APP_ROOT + "/view/1").get_data(as_text=True)):
+            self.assertIn('<img class="sighting-media"', html)
+            self.assertIn("data:image/jpeg;base64," + base64.b64encode(image).decode(), html)
+            self.assertIn("Anteprima video non disponibile", html)
+            self.assertNotIn('<video class="sighting-media"', html)
 
     def test_missing_metadata_and_image_render_without_errors(self):
         self.add_sighting(timestamp=None, image=None, filename=None, notes=None)
