@@ -152,6 +152,13 @@ def index():
     return render_template("index.html")
 
 
+@app.route(f"{APP_ROOT}/tools", methods=["GET"])
+@login_required
+def tools_page():
+    """Show downloadable utilities for authenticated users."""
+    return render_template("tools.html")
+
+
 @app.route(f"{APP_ROOT}/administration", methods=["GET", "POST"])
 @login_required
 def administration():
