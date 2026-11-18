@@ -14,6 +14,7 @@ from dotenv import dotenv_values
 from sqlalchemy import create_engine
 
 from media_cleanup import cleanup_local_videos, retention_from_config
+from photo_archive import cleanup_local_photos
 
 
 def main():
@@ -44,6 +45,11 @@ def main():
             engine, folder, apply=args.apply,
             archive_retention=archive_retention, recovery_retention=recovery_retention,
         )
+        photos = cleanup_local_photos(
+            engine, folder, apply=args.apply,
+            archive_retention=archive_retention, recovery_retention=recovery_retention,
+        )
+        result['errors'] += photos['errors']
     finally:
         engine.dispose()
     return 1 if result["errors"] else 0

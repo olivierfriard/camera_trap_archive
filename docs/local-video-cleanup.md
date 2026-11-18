@@ -4,6 +4,10 @@
 has been archived and verified. It never uploads originals and never deletes
 previews or database records.
 
+The same command also cleans up [photo originals](photo-sightings.md), using the
+same archive/recovery retention settings and retaining their JPEG previews.
+Apply the photo migration before running this updated command.
+
 Define both retention periods in the production `.env`, in hours:
 
 ```dotenv

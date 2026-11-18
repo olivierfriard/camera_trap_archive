@@ -29,6 +29,12 @@ def download_archive(remote, output, expected_md5, rclone_binary="rclone", timeo
     output = Path(output)
     if not output.name.endswith('.compressed.mp4'):
         raise ValueError("Only compressed archive MP4s may be recovered")
+    download_verified_file(remote, output, expected_md5, rclone_binary, timeout)
+
+
+def download_verified_file(remote, output, expected_md5, rclone_binary="rclone", timeout=3600):
+    """Recover a file through a verified temporary copy and atomic publication."""
+    output = Path(output)
     if output.exists():
         if output.is_file() and file_md5(output) == expected_md5:
             return
@@ -42,7 +48,7 @@ def download_archive(remote, output, expected_md5, rclone_binary="rclone", timeo
             '--checksum', '--retries', '3', '--retries-sleep', '10s', '--log-level', 'ERROR',
         ], check=True, capture_output=True, timeout=timeout)
         if file_md5(temporary).lower() != expected_md5.lower():
-            raise ValueError("Recovered MP4 does not match its archive MD5")
+            raise ValueError("Recovered file does not match its archive MD5")
         # A complete, verified file becomes visible in a single filesystem operation.
         temporary.replace(output)
     finally:

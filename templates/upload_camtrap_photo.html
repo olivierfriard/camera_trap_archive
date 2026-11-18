@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Avvistamento da foto{% endblock %}
+{% block content %}
+<section class="section">
+    <div class="container">
+        <h1 class="title is-3">Avvistamento da foto</h1>
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+        <div class="notification {{ 'is-warning' if category == 'warning' else 'is-danger' }}">{{ message }}</div>
+        {% endfor %}
+        <form method="post" action="{{ url_for('upload_camtrap_photo') }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ session['photo_upload_csrf_token'] }}" />
+            <div class="field">
+                <label class="label" for="photoUpload">Foto</label>
+                <input id="photoUpload" class="input" type="file" name="photo" accept="image/jpeg,image/png" required />
+                <p class="help">Formati JPEG e PNG. Il file originale sarà archiviato senza modifiche.</p>
+            </div>
+            <button class="button is-primary" type="submit">Carica foto</button>
+        </form>
+    </div>
+</section>
+{% endblock %}

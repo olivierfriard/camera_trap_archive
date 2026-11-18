@@ -44,7 +44,7 @@ __version__ = "0.0.3"
 
 
 VIDEO_EXTENSIONS = (".avi", ".mp4", ".mov")
-IMAGES_EXTENSIONS = (".jpg", ".jpeg")
+IMAGES_EXTENSIONS = (".jpg", ".jpeg", ".png")
 EXTENSIONS = set(VIDEO_EXTENSIONS + IMAGES_EXTENSIONS)
 
 
@@ -97,10 +97,13 @@ def banner_text_from_frame(
 
     # Apply OCR to extract text
     try:
-        extracted_text = pytesseract.image_to_string(roi_gray, config="--psm 6")
+        extracted_text = pytesseract.image_to_string(
+            roi_gray, config="--psm 6", timeout=getattr(args, "ocr_timeout", 0)
+        )
     except Exception as e:
-        print("Tesseract error: {e}", file=sys.stderr)
-        sys.exit()
+        print(f"Tesseract error: {e}", file=sys.stderr)
+        args.ocr_error = str(e)
+        return None
 
     if args.debug:
         print(f"{extracted_text=}", file=sys.stderr)
@@ -138,9 +141,12 @@ def extract_banner_text_from_video(
 
         # Process every `frame_interval` frame
         if frame_count % frame_interval == 0:
-            extracted_text = banner_text_from_frame(
-                frame, args, roi_height_fraction, position="bottom"
-            )
+            try:
+                extracted_text = banner_text_from_frame(
+                    frame, args, roi_height_fraction, position="bottom"
+                )
+            finally:
+                video_capture.release()
             break
 
         frame_count += 1

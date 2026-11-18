@@ -131,6 +131,9 @@ def run_worker(engine, upload_folder, watch=False, timeout=3600,
         if not acquired:
             return
         try:
+            from photo_archive import process_one_photo, recover_photo_jobs
+            with engine.begin() as conn:
+                recover_photo_jobs(conn)
             from archive_download import process_one_download, recover_downloads
             with engine.begin() as conn:
                 recover_downloads(conn)
@@ -148,6 +151,8 @@ def run_worker(engine, upload_folder, watch=False, timeout=3600,
                     WHERE status = 'processing'
                 """), {"maximum": MAX_ATTEMPTS})
             while True:
+                photo_downloaded = process_one_photo(engine, upload_folder, rclone_binary, archive_timeout, download=True)
+                photo_transferred = process_one_photo(engine, upload_folder, rclone_binary, archive_timeout) if archive_storage else False
                 downloaded = process_one_download(engine, upload_folder, rclone_binary, archive_timeout)
                 converted = process_one(engine, upload_folder, timeout, ffmpeg_binary=ffmpeg_binary)
                 transferred = False
@@ -155,7 +160,7 @@ def run_worker(engine, upload_folder, watch=False, timeout=3600,
                     with engine.begin() as conn:
                         enqueue_ready_transfers(conn, archive_storage)
                     transferred = process_one_transfer(engine, upload_folder, rclone_binary, archive_timeout)
-                if not converted and not transferred and not downloaded:
+                if not converted and not transferred and not downloaded and not photo_downloaded and not photo_transferred:
                     if not watch:
                         return
                     time.sleep(5)

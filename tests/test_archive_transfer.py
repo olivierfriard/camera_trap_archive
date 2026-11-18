@@ -94,6 +94,8 @@ class ArchiveQueuePostgresTests(unittest.TestCase):
         self.conn.execute(text("CREATE TEMP TABLE archive_downloads (LIKE public.archive_downloads INCLUDING ALL) ON COMMIT DROP"))
         self.conn.execute(text("CREATE TEMP TABLE media (new_file_name TEXT, converted_file_name TEXT, sighting_id INTEGER) ON COMMIT DROP"))
         self.conn.execute(text("CREATE TEMP TABLE sighting (id INTEGER PRIMARY KEY, operator TEXT) ON COMMIT DROP"))
+        for table in ('photo_archive_transfers', 'photo_archive_downloads'):
+            self.conn.execute(text(f'CREATE TEMP TABLE {table} (LIKE public.{table} INCLUDING ALL) ON COMMIT DROP'))
         self.directory = tempfile.TemporaryDirectory()
         self.folder = Path(self.directory.name)
         self.output = self.folder / "sample.avi.compressed.mp4"

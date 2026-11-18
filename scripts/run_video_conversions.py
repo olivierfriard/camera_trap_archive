@@ -1,4 +1,4 @@
-"""Run queued MP4 conversions and Drive transfers; --watch handles new uploads."""
+"""Run video conversions and photo/video archive jobs; --watch handles new uploads."""
 
 import argparse
 import logging

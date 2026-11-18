@@ -1,8 +1,8 @@
 {% if new_file_name %}
 <div class="box">
-    <p id="conversionStatus" role="status" aria-live="polite">Verifica della conversione…</p>
+    <p id="conversionStatus" role="status" aria-live="polite">{{ '' if is_photo else 'Verifica della conversione…' }}</p>
     <p id="transferStatus" class="mt-2" role="status" aria-live="polite"></p>
-    <p><a id="archiveDownload" class="button is-small mt-3 is-hidden" download>Scarica il video</a></p>
+    <p><a id="archiveDownload" class="button is-small mt-3 is-hidden" download>{{ 'Scarica la foto originale' if is_photo else 'Scarica il video' }}</a></p>
     <p><button id="archiveRestore" type="button" class="button is-small mt-3 is-hidden">Recupera dall'archivio</button></p>
     <p id="restoreStatus" class="help" role="status" aria-live="polite"></p>
 </div>
@@ -18,13 +18,14 @@
     let restoreToken = null;
     let restoring = false;
     let refreshTimer = null;
-    const conversionStatusUrl = {{url_for('video_conversion_status', filename = new_file_name) | tojson }};
+    const conversionStatusUrl = {{ (url_for('photo_archive_status', media_id=archive_media_id) if is_photo else url_for('video_conversion_status', filename=new_file_name)) | tojson }};
+    const isPhoto = {{ is_photo|default(false)|tojson }};
     async function refreshConversionStatus() {
         clearTimeout(refreshTimer);
         try {
             const response = await fetch(conversionStatusUrl, {cache: "no-store", redirect: "error"});
             if (response.status === 404) {
-                conversionStatus.textContent = "Conversione non programmata per questo video.";
+                conversionStatus.textContent = isPhoto ? "Archiviazione foto non programmata." : "Conversione non programmata per questo video.";
                 return;
             }
             if (!response.ok) throw new Error("Cannot read conversion status");
@@ -44,7 +45,7 @@
             const transferMessages = {
                 pending: "Trasferimento sull'archivio in attesa.",
                 processing: "Trasferimento sull'archivio in corso.",
-                completed: "Video archiviato e verificato",
+                completed: isPhoto ? "Foto archiviata e verificata" : "Video archiviato e verificato",
                 failed: "Trasferimento sull'archivio non riuscito. Il file locale è conservato.",
             };
             transferStatus.textContent = transferMessages[data.transfer_status] || (
@@ -66,7 +67,7 @@
                     : "Conversione in attesa. Puoi compilare e salvare i dati senza attendere.";
             }
         } catch (error) {
-            conversionStatus.textContent = "Stato della conversione temporaneamente non disponibile.";
+            conversionStatus.textContent = isPhoto ? "Stato archiviazione temporaneamente non disponibile." : "Stato della conversione temporaneamente non disponibile.";
         }
         refreshTimer = setTimeout(refreshConversionStatus, 5000);
     }

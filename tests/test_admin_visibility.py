@@ -79,7 +79,7 @@ class AdminVisibilityTests(unittest.TestCase):
                 id INTEGER PRIMARY KEY, code TEXT, timestamp ADMIN_TEST_TIMESTAMP, operator TEXT,
                 camtrap_id TEXT, wolf_number INTEGER, scalp TEXT, latitude REAL, longitude REAL, notes TEXT
             )'''))
-            conn.execute(text('CREATE TABLE media (id INTEGER PRIMARY KEY, sighting_id INTEGER, image BLOB, new_file_name TEXT)'))
+            conn.execute(text('CREATE TABLE media (id INTEGER PRIMARY KEY, sighting_id INTEGER, image BLOB, new_file_name TEXT, media_type TEXT DEFAULT \'video\', preview_file_name TEXT, capture_metadata TEXT)'))
             for id, (operator, code, latitude) in enumerate([
                 ('alice', 'FT01', 45), ('bob', 'FT01', 46),
                 ('admin', 'ADM01', 47), ('inactive', 'OLD01', 48),
@@ -93,7 +93,7 @@ class AdminVisibilityTests(unittest.TestCase):
                     (:id, :operator, '2026-11-16T12:00:00+00:00', :operator,
                      :code, 1, 'C1', NULL, NULL, :operator)
                 '''), params)
-                conn.execute(text('INSERT INTO media VALUES (:id, :id, NULL, :filename)'),
+                conn.execute(text('INSERT INTO media (id, sighting_id, image, new_file_name) VALUES (:id, :id, NULL, :filename)'),
                              dict(id=id, filename=f'{operator}.mp4'))
         for patcher in (
             patch.object(self.main, 'engine', self.database),

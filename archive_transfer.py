@@ -50,8 +50,13 @@ def copy_archive(source, destination, expected_md5, rclone_binary="rclone", time
     """Copy without deleting files and compare Drive's MD5 with the queued hash."""
     if not source.name.endswith(".compressed.mp4"):
         raise ValueError("Only compressed archive MP4s may be transferred")
+    copy_verified_file(source, destination, expected_md5, rclone_binary, timeout)
+
+
+def copy_verified_file(source, destination, expected_md5, rclone_binary="rclone", timeout=3600):
+    """Copy an immutable archive object and verify its local and remote hashes."""
     if file_md5(source) != expected_md5:
-        raise ValueError("Archive MP4 no longer matches its conversion hash")
+        raise ValueError("Local file no longer matches its archive hash")
     # Check existing content explicitly: single-file copyto does not enforce all
     # directory-copy safety flags consistently across rclone backends/versions.
     existing = subprocess.run([
@@ -76,7 +81,7 @@ def copy_archive(source, destination, expected_md5, rclone_binary="rclone", time
     ], check=True, capture_output=True, text=True, timeout=60)
     hashes = [line.split()[0].lower() for line in result.stdout.splitlines() if line.strip()]
     if hashes != [expected_md5.lower()]:
-        raise ValueError("Remote MD5 does not match the converted MP4")
+        raise ValueError("Remote MD5 does not match the archived file")
 
 
 def process_one_transfer(engine, upload_folder, rclone_binary="rclone", timeout=3600):

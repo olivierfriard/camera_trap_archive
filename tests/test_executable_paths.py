@@ -89,6 +89,8 @@ class ExecutablePathTests(unittest.TestCase):
             patch.object(video_conversion, 'process_one', return_value=False) as process,
             patch('archive_download.process_one_download', return_value=False),
             patch('archive_download.recover_downloads'),
+            patch('photo_archive.process_one_photo', return_value=False),
+            patch('photo_archive.recover_photo_jobs'),
         ):
             video_conversion.run_worker(engine, self.folder, ffmpeg_binary='/opt/media tools/ffmpeg')
             self.assertEqual(process.call_args.kwargs['ffmpeg_binary'], '/opt/media tools/ffmpeg')

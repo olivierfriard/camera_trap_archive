@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "fototrappola_coordinates.html" import coordinates, coordinate_scripts %}
+{% from "media_preview.html" import sighting_media %}
 
 {% block title %}Elenco avvistamenti{% if camtrap_id %} — Fototrappola {{ camtrap_id }}{% endif %}{% endblock %}
 
@@ -55,20 +56,7 @@
             <h2 class="title is-4 sighting-code">{{ sighting.code }}</h2>
             <div class="columns">
                 <div class="column is-half">
-                    {% if sighting.preview_url %}
-                    <video class="sighting-media" src="{{ sighting.preview_url }}" controls playsinline preload="none"
-                        width="640" {% if sighting.data_uri %}poster="{{ sighting.data_uri }}" {% endif %}>
-                        Il browser non supporta la riproduzione video.
-                    </video>
-                    {% else %}
-                    {% if sighting.data_uri %}
-                    <img class="sighting-media" src="{{ sighting.data_uri }}"
-                        alt="Immagine dell'avvistamento {{ sighting.code }}" loading="lazy" />
-                    {% else %}
-                    <p class="notification is-light">Immagine non disponibile.</p>
-                    {% endif %}
-                    <p class="help has-text-warning-dark mt-2">Anteprima video non disponibile.</p>
-                    {% endif %}
+                    {{ sighting_media(sighting.media_type, sighting.preview_url, sighting.data_uri, sighting.code) }}
                 </div>
                 <div class="column is-half">
                     <dl class="columns is-multiline is-mobile">

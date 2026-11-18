@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ 'Modifica avvistamento' if is_edit else 'Avistamento fototrappola' }}{% endblock %}
+{% block title %}{{ 'Modifica avvistamento' if is_edit else ('Avvistamento da foto' if is_photo else 'Avistamento fototrappola') }}{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -26,7 +26,7 @@
 {% block content %}
 <section class="section">
     <div class="container">
-        <h1 class="title is-3">{{ 'Modifica avvistamento' if is_edit else 'Avistamento fototrappola' }}</h1>
+        <h1 class="title is-3">{{ 'Modifica avvistamento' if is_edit else ('Avvistamento da foto' if is_photo else 'Avistamento fototrappola') }}</h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -51,12 +51,14 @@
         {% endwith %}
         {% if is_edit or video_url or new_file_name %}
         <div class="box mt-5">
-            {% if video_url %}
+            {% if is_photo and photo_preview_url %}
+            <img class="sighting-media" src="{{ photo_preview_url }}" style="max-height: 600px; max-width: 100%;" alt="Anteprima foto" />
+            {% elif video_url %}
             <video id="video_camtrap" src="{{ video_url }}" width="720" preload="metadata" controls></video>
             {% else %}
             <p class="notification is-warning">Anteprima non disponibile. Puoi comunque compilare e salvare i dati.</p>
             {% if is_edit and data_uri %}<img src="{{ data_uri }}" alt="Immagine dell'avvistamento" />{% endif %}
-            {% if not is_edit %}<a class="button is-small" href="{{ url_for('uploaded_file', filename=new_file_name) }}" download>Scarica il
+            {% if not is_edit and not is_photo %}<a class="button is-small" href="{{ url_for('uploaded_file', filename=new_file_name) }}" download>Scarica il
                 video originale</a>
             {% endif %}
             {% endif %}
@@ -82,6 +84,17 @@
                     </div>
                 </div>
             </div>
+            {% if is_photo and capture_metadata.candidates %}
+            <div class="content mt-3">
+                <p class="has-text-weight-semibold">Date rilevate al caricamento</p>
+                <p id="photoDateSource">{{ 'Valori registrati' if is_edit else ('Fonte proposta: ' ~ capture_metadata.candidates[0].label) }}</p>
+                {% for candidate in capture_metadata.candidates %}
+                <p>{{ candidate.label }}: {{ candidate.date }} {{ candidate.time }}
+                    <button class="button is-small photo-date-choice" type="button" data-date="{{ candidate.date }}" data-time="{{ candidate.time }}" data-source-label="{{ candidate.label }}">Usa questa data</button>
+                </p>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
         {% endif %}
 
@@ -91,6 +104,10 @@
             {% if is_edit %}
             <input type="hidden" name="csrf_token" value="{{ session['sighting_csrf_token'] }}" />
             {% else %}
+            {% if is_photo %}
+            <input type="hidden" name="photo_upload_token" value="{{ photo_upload_token }}" />
+            <input type="hidden" name="media_type" value="photo" />
+            {% endif %}
             <input type="hidden" name="original_file_name" value="{{ original_file_name }}" />
             <input type="hidden" name="new_file_name" value="{{ new_file_name }}" />
             <input type="hidden" name="file_content_md5" value="{{ file_content_md5 }}" />
@@ -200,4 +217,5 @@
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.22.0/dist/proj4.js" crossorigin="anonymous"></script>
 <script src="{{ url_for('static', filename='js/utm-coordinates.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sighting-coordinates.js') }}"></script>
+{% if is_photo %}<script src="{{ url_for('static', filename='js/photo-dates.js') }}"></script>{% endif %}
 {% endblock %}

@@ -1,0 +1,16 @@
+{% macro sighting_media(media_type, preview_url, data_uri, code='') %}
+{% if media_type == 'photo' %}
+    {% if preview_url or data_uri %}
+    <img class="sighting-media" src="{{ preview_url or data_uri }}" alt="Foto dell'avvistamento {{ code }}" loading="lazy" />
+    {% else %}<p>Immagine non disponibile.</p>{% endif %}
+    {% if not preview_url %}<p class="help has-text-warning-dark mt-2">Anteprima foto non disponibile.</p>{% endif %}
+{% elif preview_url %}
+<video class="sighting-media" src="{{ preview_url }}" controls playsinline preload="none" width="640" {% if data_uri %}poster="{{ data_uri }}"{% endif %}>
+    Il browser non supporta la riproduzione video.
+</video>
+{% else %}
+    {% if data_uri %}<img class="sighting-media" src="{{ data_uri }}" alt="Immagine dell'avvistamento {{ code }}" loading="lazy" />
+    {% else %}<p>Immagine non disponibile.</p>{% endif %}
+    <p class="help has-text-warning-dark mt-2">Anteprima video non disponibile.</p>
+{% endif %}
+{% endmacro %}

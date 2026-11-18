@@ -41,7 +41,7 @@ class SightingListTests(unittest.TestCase):
                     longitude REAL, notes TEXT, operator TEXT
                 )
             """))
-            conn.execute(text("CREATE TABLE media (id INTEGER PRIMARY KEY, sighting_id INTEGER, image BLOB, new_file_name TEXT)"))
+            conn.execute(text("CREATE TABLE media (id INTEGER PRIMARY KEY, sighting_id INTEGER, image BLOB, new_file_name TEXT, media_type TEXT DEFAULT 'video', preview_file_name TEXT, capture_metadata TEXT)"))
             conn.execute(text("CREATE TABLE fototrappole (codice TEXT, operator TEXT, latitudine REAL, longitudine REAL)"))
             conn.execute(text("INSERT INTO fototrappole VALUES ('FT01', 'user', 0, 7.6)"))
         account = dict(username="user", fullname="Nome Utente", institution="Test", code="T", is_active=True, is_admin=False)
@@ -63,7 +63,7 @@ class SightingListTests(unittest.TestCase):
                 INSERT INTO sighting VALUES
                     (:id, :code, :timestamp, 'FT01', 0, 'C1', :latitude, :longitude, :notes, :operator)
             """), dict(id=id, code=code, timestamp=timestamp, notes=notes, operator=operator, latitude=latitude, longitude=longitude))
-            conn.execute(text("INSERT INTO media VALUES (:id, :id, :image, :filename)"), dict(id=id, image=image, filename=filename))
+            conn.execute(text("INSERT INTO media (id, sighting_id, image, new_file_name) VALUES (:id, :id, :image, :filename)"), dict(id=id, image=image, filename=filename))
 
     def get_list(self):
         response = self.client.get(self.main.APP_ROOT + "/sighting_list?operator=someone-else")

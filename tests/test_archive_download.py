@@ -86,6 +86,8 @@ class DownloadQueuePostgresTests(unittest.TestCase):
         self.addCleanup(transaction.rollback)
         for table in ('video_conversions', 'archive_transfers', 'archive_downloads'):
             self.conn.execute(text(f'CREATE TEMP TABLE {table} (LIKE public.{table} INCLUDING ALL) ON COMMIT DROP'))
+        for table in ('photo_archive_transfers', 'photo_archive_downloads'):
+            self.conn.execute(text(f'CREATE TEMP TABLE {table} (LIKE public.{table} INCLUDING ALL) ON COMMIT DROP'))
         self.conn.execute(text('CREATE TEMP TABLE sighting (id INTEGER PRIMARY KEY, operator TEXT) ON COMMIT DROP'))
         self.conn.execute(text('CREATE TEMP TABLE media (sighting_id INTEGER, new_file_name TEXT) ON COMMIT DROP'))
         self.output = self.folder / 'sample.avi.compressed.mp4'
