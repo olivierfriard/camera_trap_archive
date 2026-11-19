@@ -148,6 +148,31 @@ class SightingEditTests(unittest.TestCase):
         self.main.camtrap_banner_decoder.extract_date_time.assert_not_called()
         self.main.subprocess.run.assert_not_called()
 
+    def test_owner_and_admin_can_edit_and_clear_optional_fields(self):
+        for username in ('alice', 'admin'):
+            with self.subTest(username=username):
+                self.fixture.login(username)
+                response = self.client.post(self.path, data=self.data(pup_number='2', anomaly='Zoppia'))
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual((self.row()['pup_number'], self.row()['anomaly']), (2, 'Zoppia'))
+                form = self.client.get(self.path).get_data(as_text=True)
+                self.assertEqual(Form(form).fields['pup_number']['value'], '2')
+                self.assertIn('Zoppia</textarea>', form)
+                response = self.client.post(self.path, data=self.data(pup_number='', anomaly='  '))
+                self.assertEqual(response.status_code, 302)
+                self.assertIsNone(self.row()['pup_number'])
+                self.assertIsNone(self.row()['anomaly'])
+
+    def test_edit_rejects_invalid_pup_number_and_preserves_anomaly(self):
+        before = self.row()
+        for value in ('-1', '1.5', '2147483648'):
+            response = self.client.post(self.path, data=self.data(pup_number=value, anomaly='<draft>'))
+            self.assertEqual(response.status_code, 400)
+            html = response.get_data(as_text=True)
+            self.assertEqual(Form(html).fields['pup_number']['value'], value)
+            self.assertIn('&lt;draft&gt;</textarea>', html)
+        self.assertEqual(self.row(), before)
+
     def test_administrator_edits_another_owners_sighting_with_owner_cameras(self):
         self.fixture.login('admin')
         response = self.client.get(self.path)

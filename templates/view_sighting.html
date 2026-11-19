@@ -34,6 +34,8 @@
         </div>
 
         Number of wolves; <b>{{ row.wolf_number }}</b><br>
+        Numero di cuccioli: <b>{{ row.pup_number if row.pup_number is not none else 'Non indicato' }}</b><br>
+        Anomalia: <span style="white-space: pre-wrap">{{ row.anomaly if row.anomaly else 'Non indicata' }}</span><br>
 
         SCALP: <b>{{ row.scalp }}</b><br>
 

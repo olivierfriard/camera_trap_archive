@@ -77,7 +77,8 @@ class AdminVisibilityTests(unittest.TestCase):
             )'''))
             conn.execute(text('''CREATE TABLE sighting (
                 id INTEGER PRIMARY KEY, code TEXT, timestamp ADMIN_TEST_TIMESTAMP, operator TEXT,
-                camtrap_id TEXT, wolf_number INTEGER, scalp TEXT, latitude REAL, longitude REAL, notes TEXT
+                camtrap_id TEXT, wolf_number INTEGER, scalp TEXT, latitude REAL, longitude REAL, notes TEXT,
+                pup_number INTEGER, anomaly TEXT
             )'''))
             conn.execute(text('CREATE TABLE media (id INTEGER PRIMARY KEY, sighting_id INTEGER, image BLOB, new_file_name TEXT, media_type TEXT DEFAULT \'video\', preview_file_name TEXT, capture_metadata TEXT)'))
             for id, (operator, code, latitude) in enumerate([
@@ -89,7 +90,7 @@ class AdminVisibilityTests(unittest.TestCase):
                     (:code, :operator, :operator, '2026-11-01', NULL, '', '',
                      'Piemonte', 'Torino', 'Torino', 'Bosco', 'Italia', :latitude, 7, 300, '')
                 '''), params)
-                conn.execute(text('''INSERT INTO sighting VALUES
+                conn.execute(text('''INSERT INTO sighting (id, code, timestamp, operator, camtrap_id, wolf_number, scalp, latitude, longitude, notes) VALUES
                     (:id, :operator, '2026-11-16T12:00:00+00:00', :operator,
                      :code, 1, 'C1', NULL, NULL, :operator)
                 '''), params)

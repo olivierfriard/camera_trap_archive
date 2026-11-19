@@ -64,9 +64,12 @@
                         {{ detail('Data e ora', sighting.date_time) }}
                         {{ detail('ID fototrappola', sighting.camtrap_id) }}
                         {{ detail('Numero di lupi', sighting.wolf_number) }}
+                        {{ detail('Numero di cuccioli', sighting.pup_number) }}
                         {{ detail('SCALP', sighting.scalp) }}
                     </dl>
                     {{ coordinates(sighting.latitude, sighting.longitude, sighting.coordinate_source) }}
+                    <p class="has-text-weight-semibold">Anomalia</p>
+                    <p class="sighting-notes mb-4">{{ sighting.anomaly if sighting.anomaly else 'Non indicata' }}</p>
                     <p class="has-text-weight-semibold">Note</p>
                     <p class="sighting-notes mb-4">{{ sighting.notes if sighting.notes else 'Nessuna nota.' }}</p>
                     <a class="button is-link is-small" href="{{ url_for('view', sighting_id=sighting.id, operator=selected_operator, camtrap_id=camtrap_id) if session.get('is_admin') else url_for('view', sighting_id=sighting.id) }}">Apri

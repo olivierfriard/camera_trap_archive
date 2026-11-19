@@ -19,6 +19,7 @@ from werkzeug.utils import secure_filename
 
 from photo_archive import enqueue_photo, enqueue_photo_download
 from photo_media import PHOTO_EXTENSIONS, md5_file, photo_path, prepare_photo, thumbnail_bytes
+from sighting_fields import parse_pup_number
 
 
 def metadata_dict(value):
@@ -63,6 +64,8 @@ def photo_form(main, data, token, values=None, status=200):
     default_code = ('A' + selected[2:].replace('-', '') if selected else 'A') + session.get('code', '')
     values.setdefault('code', default_code)
     values.setdefault('wolf_number', '')
+    values.setdefault('pup_number', '')
+    values.setdefault('anomaly', '')
     values.setdefault('scalp', '')
     values.setdefault('notes', '')
     return render_template('upload_camtrap_sighting.html', is_photo=True,
@@ -76,10 +79,15 @@ def photo_form(main, data, token, values=None, status=200):
 def save_photo_sighting(main):
     data, path = uploaded_photo(main)
     values = {key: request.form.get(key, '').strip() for key in (
-        'code', 'camtrap_id', 'date', 'time_', 'latitude', 'longitude', 'wolf_number', 'scalp',
+        'code', 'camtrap_id', 'date', 'time_', 'latitude', 'longitude', 'wolf_number', 'pup_number', 'scalp',
     )}
     values['notes'] = request.form.get('note', '')
+    values['anomaly'] = request.form.get('anomaly', '')
     errors = []
+    try:
+        pups = parse_pup_number(values['pup_number'])
+    except ValueError as error:
+        errors.append(str(error))
     if not values['code']:
         errors.append("Il codice dell'avvistamento è obbligatorio.")
     try:
@@ -143,10 +151,11 @@ def save_photo_sighting(main):
             if stamp is not None and item['date'] == stamp.strftime('%Y-%m-%d') and item['time'] == stamp.strftime('%H:%M:%S')), 'manual')
         with main.engine.begin() as conn:
             sighting_id = conn.execute(text('''INSERT INTO sighting
-                (code, operator, institution, timestamp, camtrap_id, wolf_number, scalp, latitude, longitude, notes)
-                VALUES (:code, :operator, :institution, :timestamp, :camtrap_id, :wolves, :scalp, :lat, :lon, :notes)
+                (code, operator, institution, timestamp, camtrap_id, wolf_number, pup_number, anomaly, scalp, latitude, longitude, notes)
+                VALUES (:code, :operator, :institution, :timestamp, :camtrap_id, :wolves, :pups, :anomaly, :scalp, :lat, :lon, :notes)
                 RETURNING id'''), dict(code=values['code'], operator=session['username'], institution=session['institution'],
                                        timestamp=stamp, camtrap_id=values['camtrap_id'] or None, wolves=wolves,
+                                       pups=pups, anomaly=values['anomaly'] if values['anomaly'].strip() else None,
                                        scalp=values['scalp'], lat=lat, lon=lon, notes=values['notes'] or None)).scalar_one()
             media_id = conn.execute(text('''INSERT INTO media
                 (sighting_id, original_file_name, new_file_name, file_content_md5, image, media_type, preview_file_name, capture_metadata)

@@ -161,7 +161,7 @@
             {% include "sighting_coordinates_editor.html" %}
 
             <div class="columns is-multiline">
-                <div class="column is-half">
+                <div class="column is-one-third">
                     <div class="field">
                         <label class="label">Numero di lupi</label>
                         <div class="control">
@@ -170,7 +170,16 @@
                         </div>
                     </div>
                 </div>
-                <div class="column is-half">
+                <div class="column is-one-third">
+                    <div class="field">
+                        <label class="label" for="pup_number">Numero di cuccioli</label>
+                        <div class="control">
+                            <input class="input" id="pup_number" name="pup_number" type="number" min="0" max="2147483647" step="1"
+                                value="{{ pup_number if pup_number is defined and pup_number is not none else '' }}" />
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-one-third">
                     <div class="field">
                         <label class="label" for="scalp">SCALP</label>scalp: {{ scalp }}
                         <div class="control">
@@ -186,6 +195,13 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="label" for="anomaly">Anomalia</label>
+                <div class="control">
+                    <textarea id="anomaly" name="anomaly" class="textarea" rows="2">{{ anomaly|default('', true) }}</textarea>
                 </div>
             </div>
 

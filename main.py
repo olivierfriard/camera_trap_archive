@@ -47,6 +47,7 @@ from geocoding import GeocodingError
 from geocoding import reverse_geocode as lookup_address
 from video_conversion import enqueue_conversion
 from photo_media import PHOTO_EXTENSIONS
+from sighting_fields import parse_pup_number
 
 config_filename = Path(__file__).with_name(".env")
 
@@ -945,6 +946,14 @@ def save_sighting():
     camtrap_id = request.form.get("camtrap_id")
     code = request.form.get("code")
     wolf_number = request.form.get("wolf_number")
+    pup_number_input = request.form.get("pup_number", "")
+    anomaly = request.form.get("anomaly", "")
+    invalid_pup_number = False
+    try:
+        pup_number = parse_pup_number(pup_number_input)
+    except ValueError as error:
+        invalid_pup_number = True
+        flash(str(error), "danger")
     scalp = request.form.get("scalp")
     notes = request.form.get("note") if request.form.get("note") else None
     latitude = request.form.get("latitude")
@@ -1021,7 +1030,7 @@ def save_sighting():
         # check if code already present in database
         query = text("SELECT COUNT(*) FROM sighting WHERE code = :code")
         n_code = conn.execute(query, {"code": code}).scalar()
-        if n_code or invalid_timestamp or invalid_coordinates or invalid_camera:
+        if n_code or invalid_timestamp or invalid_coordinates or invalid_camera or invalid_pup_number:
             if n_code:
                 flash(
                     Markup(
@@ -1071,6 +1080,8 @@ def save_sighting():
                 file_content_md5=file_content_md5,
                 camtrap_id=camtrap_id,
                 wolf_number=wolf_number,
+                pup_number=pup_number_input,
+                anomaly=anomaly,
                 notes=notes if notes is not None else "",
                 latitude=latitude,
                 longitude=longitude,
@@ -1082,9 +1093,9 @@ def save_sighting():
 
         query = text("""
             INSERT INTO sighting
-                (code, operator, institution, timestamp, camtrap_id, scalp, transect_id, wolf_number, latitude, longitude, notes)
+                (code, operator, institution, timestamp, camtrap_id, scalp, transect_id, wolf_number, pup_number, anomaly, latitude, longitude, notes)
             VALUES
-                (:code, :operator, :institution, :timestamp, :camtrap_id, :scalp, :transect_id, :wolf_number, :latitude, :longitude, :notes)
+                (:code, :operator, :institution, :timestamp, :camtrap_id, :scalp, :transect_id, :wolf_number, :pup_number, :anomaly, :latitude, :longitude, :notes)
             RETURNING id;
         """)
 
@@ -1099,6 +1110,8 @@ def save_sighting():
                 "scalp": scalp,
                 "transect_id": transect_id if transect_id else None,
                 "wolf_number": wolf_number,
+                "pup_number": pup_number,
+                "anomaly": anomaly if anomaly.strip() else None,
                 "latitude": latitude,
                 "longitude": longitude,
                 "notes": notes,
@@ -1270,7 +1283,7 @@ def sighting_list():
                 abort(404)
         query = text(
             """
-            SELECT s.id, s.code, s.operator, s.timestamp, s.camtrap_id, s.wolf_number,
+            SELECT s.id, s.code, s.operator, s.timestamp, s.camtrap_id, s.wolf_number, s.pup_number, s.anomaly,
                    s.scalp,
                    CASE WHEN s.latitude IS NOT NULL AND s.longitude IS NOT NULL
                         THEN s.latitude ELSE f.latitudine END AS latitude,
@@ -1484,6 +1497,8 @@ def edit_sighting(sighting_id):
             code=row["code"] or "",
             camtrap_id=row["camtrap_id"] or "",
             wolf_number=row["wolf_number"] if row["wolf_number"] is not None else "",
+            pup_number=row["pup_number"] if row["pup_number"] is not None else "",
+            anomaly=row["anomaly"] or "",
             scalp=row["scalp"] or "",
             notes=row["notes"] or "",
             latitude=latitude,
@@ -1499,6 +1514,7 @@ def edit_sighting(sighting_id):
                         "code",
                         "camtrap_id",
                         "wolf_number",
+                        "pup_number",
                         "scalp",
                         "latitude",
                         "longitude",
@@ -1508,8 +1524,13 @@ def edit_sighting(sighting_id):
                 }
             )
             values["notes"] = request.form.get("note", "")
+            values["anomaly"] = request.form.get("anomaly", "")
             camera = camera_by_code.get(values["camtrap_id"])
             errors = []
+            try:
+                pup_number = parse_pup_number(values["pup_number"])
+            except ValueError as error:
+                errors.append(str(error))
             if not values["code"]:
                 errors.append("Il codice dell'avvistamento è obbligatorio.")
             elif conn.execute(
@@ -1586,6 +1607,7 @@ def edit_sighting(sighting_id):
                         text("""
                         UPDATE sighting SET code = :code, timestamp = :timestamp,
                             camtrap_id = :camtrap_id, wolf_number = :wolf_number,
+                            pup_number = :pup_number, anomaly = :anomaly,
                             scalp = :scalp, notes = :notes, latitude = :latitude, longitude = :longitude
                         WHERE id = :sighting_id AND operator = :operator
                     """),
@@ -1596,6 +1618,8 @@ def edit_sighting(sighting_id):
                             timestamp=timestamp,
                             camtrap_id=values["camtrap_id"] or None,
                             wolf_number=wolf_number,
+                            pup_number=pup_number,
+                            anomaly=values["anomaly"] if values["anomaly"].strip() else None,
                             scalp=values["scalp"],
                             notes=values["notes"] or None,
                             latitude=latitude,
@@ -1675,7 +1699,7 @@ def view(sighting_id: int):
         query = text(
             """
             SELECT s.id, s.code, s.operator, s.camtrap_id, s.scalp, m.image,
-                   s.wolf_number, s.notes, m.new_file_name, m.id AS media_id,
+                   s.wolf_number, s.pup_number, s.anomaly, s.notes, m.new_file_name, m.id AS media_id,
                    m.media_type, m.preview_file_name,
                    CASE WHEN s.latitude IS NOT NULL AND s.longitude IS NOT NULL
                         THEN s.latitude ELSE f.latitudine END AS latitude,

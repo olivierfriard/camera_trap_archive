@@ -136,6 +136,32 @@ class PhotoWebTests(unittest.TestCase):
         self.assertIn('photo_upload_token', response.get_data(as_text=True))
         self.assertEqual(self.rows('photo_archive_transfers'), [])
 
+    def test_photo_saves_optional_fields_and_escapes_anomaly_in_list_and_view(self):
+        payload = self.data(self.upload().get_data(as_text=True), pup_number='0', anomaly='<b>Zoppia</b>')
+        response = self.client.post(self.prefix + '/save_info', data=payload)
+        self.assertEqual(response.status_code, 302)
+        row = next(row for row in self.rows('sighting') if row['code'] == 'PHOTO-TEST')
+        self.assertEqual(row['pup_number'], 0)
+        self.assertEqual(row['anomaly'], '<b>Zoppia</b>')
+        for url in (response.location, self.prefix + '/sighting_list'):
+            html = self.client.get(url).get_data(as_text=True)
+            self.assertIn('Numero di cuccioli', html)
+            self.assertIn('&lt;b&gt;Zoppia&lt;/b&gt;', html)
+
+    def test_photo_rejects_invalid_pup_number_without_losing_draft(self):
+        payload = self.data(self.upload().get_data(as_text=True), anomaly='<draft>')
+        before = len(self.rows('sighting'))
+        for value in ('-1', '1.5', '2147483648'):
+            response = self.client.post(self.prefix + '/save_info', data=dict(payload, pup_number=value))
+            self.assertEqual(response.status_code, 400)
+            html = response.get_data(as_text=True)
+            self.assertEqual(Form(html).fields['pup_number']['value'], value)
+            self.assertIn('&lt;draft&gt;', html)
+        self.assertEqual(len(self.rows('sighting')), before)
+        self.assertIn('&lt;draft&gt;', response.get_data(as_text=True))
+        self.assertIn('photo_upload_token', response.get_data(as_text=True))
+        self.assertEqual(self.rows('photo_archive_transfers'), [])
+
     def test_signed_upload_cannot_be_stolen_or_tampered_with(self):
         html = self.upload().get_data(as_text=True)
         payload = self.data(html)

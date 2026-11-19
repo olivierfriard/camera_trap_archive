@@ -38,7 +38,7 @@ class SightingListTests(unittest.TestCase):
                 CREATE TABLE sighting (
                     id INTEGER PRIMARY KEY, code TEXT, timestamp SIGHTING_TEST_TIMESTAMP,
                     camtrap_id TEXT, wolf_number INTEGER, scalp TEXT, latitude REAL,
-                    longitude REAL, notes TEXT, operator TEXT
+                    longitude REAL, notes TEXT, operator TEXT, pup_number INTEGER, anomaly TEXT
                 )
             """))
             conn.execute(text("CREATE TABLE media (id INTEGER PRIMARY KEY, sighting_id INTEGER, image BLOB, new_file_name TEXT, media_type TEXT DEFAULT 'video', preview_file_name TEXT, capture_metadata TEXT)"))
@@ -60,7 +60,7 @@ class SightingListTests(unittest.TestCase):
     def add_sighting(self, id=1, code="TEST", timestamp="2026-11-15T12:34:56+00:00", operator="user", image=b"database image", filename="sample.mp4", notes="Nota di prova", latitude=None, longitude=None):
         with self.database.begin() as conn:
             conn.execute(text("""
-                INSERT INTO sighting VALUES
+                INSERT INTO sighting (id, code, timestamp, camtrap_id, wolf_number, scalp, latitude, longitude, notes, operator) VALUES
                     (:id, :code, :timestamp, 'FT01', 0, 'C1', :latitude, :longitude, :notes, :operator)
             """), dict(id=id, code=code, timestamp=timestamp, notes=notes, operator=operator, latitude=latitude, longitude=longitude))
             conn.execute(text("INSERT INTO media (id, sighting_id, image, new_file_name) VALUES (:id, :id, :image, :filename)"), dict(id=id, image=image, filename=filename))

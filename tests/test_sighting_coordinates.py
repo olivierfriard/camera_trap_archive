@@ -71,6 +71,25 @@ class SightingCoordinatesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual((self.inserts[0]["latitude"], self.inserts[0]["longitude"]), (45.0703, 7.6869))
 
+    def test_optional_pup_number_and_anomaly_are_saved_for_video(self):
+        for value, expected in (('', None), ('0', 0), ('3', 3)):
+            with self.subTest(value=value):
+                self.assertEqual(self.post(pup_number=value, anomaly='Zoppia\nArto posteriore').status_code, 302)
+                self.assertEqual(self.inserts[-1]['pup_number'], expected)
+                self.assertEqual(self.inserts[-1]['anomaly'], 'Zoppia\nArto posteriore')
+        self.assertEqual(self.post(anomaly='  ').status_code, 302)
+        self.assertIsNone(self.inserts[-1]['anomaly'])
+
+    def test_invalid_pup_number_keeps_video_form_without_inserting(self):
+        for value in ('-1', '1.5', 'abc', '2147483648'):
+            with self.subTest(value=value):
+                response = self.post(pup_number=value, anomaly='<draft>')
+                html = response.get_data(as_text=True)
+                self.assertIn('Il numero di cuccioli', html)
+                self.assertIn('value="' + value + '"', html)
+                self.assertIn('&lt;draft&gt;', html)
+                self.assertEqual(self.inserts, [])
+
     def test_edited_coordinates_are_saved_without_updating_camera(self):
         original = dict(self.camera)
         response = self.post(latitude="0", longitude="-15.25", operator="someone-else")
