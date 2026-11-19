@@ -36,6 +36,8 @@ class PhotoWebTests(unittest.TestCase):
                 conn.execute(text(f'ALTER TABLE media ADD COLUMN {field} TEXT'))
             conn.execute(text('CREATE TABLE photo_archive_transfers (media_id INTEGER PRIMARY KEY, source_filename TEXT UNIQUE, source_md5 TEXT, destination TEXT, status TEXT DEFAULT \'pending\', attempts INTEGER DEFAULT 0)'))
             conn.execute(text('CREATE TABLE photo_archive_downloads (media_id INTEGER PRIMARY KEY, status TEXT DEFAULT \'pending\', attempts INTEGER DEFAULT 0, started_at TEXT, finished_at TEXT, last_error TEXT, next_attempt_at TEXT)'))
+            conn.execute(text('ALTER TABLE photo_archive_transfers ADD COLUMN archive_filename TEXT'))
+            conn.execute(text('ALTER TABLE photo_archive_transfers ADD COLUMN archive_md5 TEXT'))
         for patcher in (
             patch.dict(self.main.config, archive_storage='OF2/test_photos'),
             patch.object(self.main.camtrap_banner_decoder, 'extract_date_time', return_value={'date': '2026-11-18', 'time': '123456'}),
@@ -90,7 +92,7 @@ class PhotoWebTests(unittest.TestCase):
         self.assertEqual(self.rows('photo_archive_transfers'), [])
         self.main.start_conversion_worker.assert_not_called()
 
-    def test_save_is_atomic_and_archives_original_without_video_conversion(self):
+    def test_save_atomically_queues_webp_and_retains_original_without_video_conversion(self):
         response = self.upload()
         html = response.get_data(as_text=True)
         payload = self.data(html, operator='bob', file_content_md5='forged', date='2026-11-19', time_='10:20')
@@ -109,7 +111,8 @@ class PhotoWebTests(unittest.TestCase):
         self.assertTrue(media['image'])
         self.assertEqual(json.loads(media['capture_metadata'])['initial_selection'], 'manual')
         self.assertEqual(job['source_md5'], checksum)
-        self.assertEqual(job['destination'], 'OF2:test_photos/' + source_name)
+        self.assertEqual(job['destination'], 'OF2:test_photos/' + source_name + '.webp')
+        self.assertEqual(job['archive_filename'], source_name + '.webp')
         self.assertEqual(source.read_bytes(), self.image_bytes())
         self.main.extract_frame.assert_not_called()
         self.main.start_conversion_worker.assert_called_once()
@@ -161,10 +164,17 @@ class PhotoWebTests(unittest.TestCase):
         url = self.prefix + '/photo_archive_status/' + str(media['id'])
         status = self.client.get(url)
         self.assertEqual(status.status_code, 200)
-        self.assertTrue(status.json['download_url'].endswith(payload['new_file_name']))
+        self.assertEqual(status.json['status'], 'pending')
+        self.assertIsNone(status.json['download_url'])
+        from photo_conversion import convert_photo
+        source = self.fixture.folder / payload['new_file_name']
+        converted = source.with_name(source.name + '.webp')
+        digest = convert_photo(source, converted, media['file_content_md5'])
         with self.db.begin() as conn:
-            conn.execute(text("UPDATE photo_archive_transfers SET status='completed'"))
-        (self.fixture.folder / payload['new_file_name']).unlink()
+            conn.execute(text("UPDATE photo_archive_transfers SET status='completed', archive_md5=:md5"), {'md5':digest})
+        self.assertTrue(self.client.get(url).json['download_url'].endswith('.webp'))
+        source.unlink()
+        converted.unlink()
         status = self.client.get(url)
         self.assertIsNone(status.json['download_url'])
         self.assertTrue(status.json['restore_url'])

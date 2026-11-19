@@ -2,7 +2,7 @@
 <div class="box">
     <p id="conversionStatus" role="status" aria-live="polite">{{ '' if is_photo else 'Verifica della conversione…' }}</p>
     <p id="transferStatus" class="mt-2" role="status" aria-live="polite"></p>
-    <p><a id="archiveDownload" class="button is-small mt-3 is-hidden" download>{{ 'Scarica la foto originale' if is_photo else 'Scarica il video' }}</a></p>
+    <p><a id="archiveDownload" class="button is-small mt-3 is-hidden" download>{{ 'Scarica la foto' if is_photo else 'Scarica il video' }}</a></p>
     <p><button id="archiveRestore" type="button" class="button is-small mt-3 is-hidden">Recupera dall'archivio</button></p>
     <p id="restoreStatus" class="help" role="status" aria-live="polite"></p>
 </div>
@@ -58,7 +58,7 @@
                 if (!restoreRunning && (!data.saved || data.transfer_status === "completed" || data.transfer_status === "failed")) return;
             }
             if (data.status === "failed") {
-                conversionStatus.textContent = "Conversione non riuscita. Puoi comunque salvare i dati; il video originale è conservato.";
+                conversionStatus.textContent = isPhoto ? "Conversione WebP non riuscita. La foto originale è conservata." : "Conversione non riuscita. Puoi comunque salvare i dati; il video originale è conservato.";
                 return;
             }
             if (data.status !== "completed") {

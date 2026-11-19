@@ -50,6 +50,8 @@ class PhotoArchivePostgresTests(unittest.TestCase):
         self.conn.execute(text("INSERT INTO fototrappole VALUES ('FT01','user','Camera','','','Torino','Torino','Piemonte',45,7)"))
         for table in ('photo_archive_transfers', 'photo_archive_downloads', 'video_conversions', 'archive_transfers', 'archive_downloads'):
             self.conn.execute(text(f'CREATE TEMP TABLE {table} (LIKE public.{table} INCLUDING ALL) ON COMMIT DROP'))
+        for column in ('archive_filename', 'archive_md5'):
+            self.conn.execute(text(f'ALTER TABLE photo_archive_transfers ADD COLUMN IF NOT EXISTS {column} TEXT'))
         connection = self.conn
 
         class TransactionEngine:
@@ -101,7 +103,8 @@ class PhotoArchivePostgresTests(unittest.TestCase):
         self.media = self.conn.execute(text('SELECT * FROM media')).mappings().one()
         self.source = self.folder / self.media['new_file_name']
         self.preview = self.folder / self.media['preview_file_name']
-        self.remote = self.folder / 'remote' / self.source.name
+        self.converted = self.source.with_name(self.source.name + '.webp')
+        self.remote = self.folder / 'remote' / self.converted.name
         self.remote.parent.mkdir(exist_ok=True)
         self.conn.execute(text('UPDATE photo_archive_transfers SET destination=:remote'), {'remote':str(self.remote)})
         self.status_url = self.main.APP_ROOT + '/photo_archive_status/' + str(self.media['id'])
@@ -120,18 +123,22 @@ class PhotoArchivePostgresTests(unittest.TestCase):
         return photo_archive.cleanup_local_photos(self.engine, self.folder, apply=apply, now=now,
             archive_retention=timedelta(hours=48), recovery_retention=timedelta(hours=24))
 
-    def test_real_rclone_archive_cleanup_and_recovery_preserve_original_and_preview(self):
+    def test_real_rclone_webp_archive_cleanup_and_recovery_preserve_metadata_and_preview(self):
         self.save()
         self.assertTrue(photo_archive.process_one_photo(self.engine, self.folder, self.binary(), 30))
         self.assertEqual(self.job()['status'], 'completed')
-        self.assertEqual(self.remote.read_bytes(), self.original)
-        self.assertEqual(md5_file(self.remote), self.media['file_content_md5'])
+        from photo_conversion import read_preserved_metadata, source_metadata
+        self.assertEqual(self.remote.read_bytes(), self.converted.read_bytes())
+        self.assertEqual(read_preserved_metadata(self.remote), source_metadata(self.source))
+        self.assertEqual(self.source.read_bytes(), self.original)
+        self.assertEqual(md5_file(self.remote), self.job()['archive_md5'])
+        self.assertEqual(self.conn.execute(text('SELECT converted_file_name FROM media')).scalar(), self.converted.name)
         metadata = self.media['capture_metadata']
         self.assertEqual(metadata['initial_source'], 'ocr')
         self.conn.execute(text("UPDATE photo_archive_transfers SET finished_at=CURRENT_TIMESTAMP-INTERVAL '3 days'"))
-        self.assertEqual(self.cleanup(apply=False)['eligible_files'], 1)
+        self.assertEqual(self.cleanup(apply=False)['eligible_files'], 2)
         self.assertTrue(self.source.exists())
-        self.assertEqual(self.cleanup()['deleted_files'], 1)
+        self.assertEqual(self.cleanup()['deleted_files'], 2)
         self.assertTrue(self.preview.exists())
         status = self.client.get(self.status_url).json
         self.assertIsNone(status['download_url'])
@@ -142,7 +149,8 @@ class PhotoArchivePostgresTests(unittest.TestCase):
         self.assertEqual(self.cleanup()['deleted_files'], 0)
         self.assertTrue(photo_archive.process_one_photo(self.engine, self.folder, self.binary(), 30, download=True))
         self.assertEqual(self.job(download=True)['status'], 'completed')
-        self.assertEqual(self.source.read_bytes(), self.original)
+        self.assertFalse(self.source.exists())
+        self.assertEqual(self.converted.read_bytes(), self.remote.read_bytes())
         recovered = self.job(download=True)['finished_at']
         self.assertEqual(self.cleanup(now=recovered+timedelta(hours=23))['deleted_files'], 0)
         self.assertEqual(self.cleanup(now=recovered+timedelta(hours=25))['deleted_files'], 1)
@@ -158,26 +166,54 @@ class PhotoArchivePostgresTests(unittest.TestCase):
 
     def test_copy_failures_retry_then_stop_and_keep_local_photo(self):
         self.save()
-        with patch('photo_archive.copy_verified_file', side_effect=OSError('network unavailable')):
+        with patch('photo_archive.copy_verified_file', side_effect=OSError('network unavailable')), \
+                patch('photo_archive.convert_photo', wraps=photo_archive.convert_photo) as convert:
             for attempt in range(1,4):
                 self.conn.execute(text('UPDATE photo_archive_transfers SET next_attempt_at=CURRENT_TIMESTAMP'))
                 self.assertTrue(photo_archive.process_one_photo(self.engine, self.folder))
                 self.assertEqual(self.job()['attempts'], attempt)
                 self.assertEqual(self.job()['status'], 'failed' if attempt==3 else 'pending')
                 self.assertFalse(photo_archive.process_one_photo(self.engine, self.folder))
+            convert.assert_called_once()
         self.assertEqual(self.source.read_bytes(), self.original)
         self.assertTrue(self.preview.exists())
         self.assertEqual(self.cleanup(now=datetime.now(timezone.utc)+timedelta(days=10))['deleted_files'], 0)
 
+    def test_conversion_failure_never_transfers_or_expires_original(self):
+        self.save()
+        with patch('photo_archive.convert_photo', side_effect=ValueError('metadata mismatch')), \
+                patch('photo_archive.copy_verified_file') as copy:
+            self.assertTrue(photo_archive.process_one_photo(self.engine, self.folder))
+            copy.assert_not_called()
+        self.assertIsNone(self.job()['archive_md5'])
+        self.assertIn('metadata mismatch', self.job()['last_error'])
+        self.assertEqual(self.source.read_bytes(), self.original)
+        self.assertEqual(self.cleanup(now=datetime.now(timezone.utc)+timedelta(days=10))['deleted_files'], 0)
+
+    def test_recovery_retention_does_not_shorten_original_retention(self):
+        self.save()
+        self.assertTrue(photo_archive.process_one_photo(self.engine, self.folder, self.binary(), 30))
+        self.conn.execute(text("UPDATE photo_archive_transfers SET finished_at=CURRENT_TIMESTAMP-INTERVAL '26 hours'"))
+        photo_archive.enqueue_photo_download(self.conn, self.media['id'])
+        self.conn.execute(text("UPDATE photo_archive_downloads SET status='completed', finished_at=CURRENT_TIMESTAMP-INTERVAL '25 hours'"))
+        self.assertEqual(self.cleanup()['deleted_files'], 1)
+        self.assertTrue(self.source.exists())
+        self.assertFalse(self.converted.exists())
+        self.assertTrue(self.preview.exists())
+
     def test_interrupted_recovery_and_explicit_retry(self):
         self.save()
-        self.conn.execute(text("UPDATE photo_archive_transfers SET status='completed', finished_at=CURRENT_TIMESTAMP"))
+        # Existing original-photo archives remain recoverable after the upgrade.
+        self.conn.execute(text("UPDATE photo_archive_transfers SET archive_filename=NULL, status='completed', finished_at=CURRENT_TIMESTAMP"))
+        self.remote.write_bytes(self.original)
+        self.source.unlink()
         photo_archive.enqueue_photo_download(self.conn, self.media['id'])
         self.conn.execute(text("UPDATE photo_archive_downloads SET status='processing', attempts=1"))
         photo_archive.recover_photo_jobs(self.conn)
-        self.assertTrue(photo_archive.process_one_photo(self.engine, self.folder, download=True))
+        self.assertTrue(photo_archive.process_one_photo(self.engine, self.folder, self.binary(), 30, download=True))
         self.assertEqual(self.job(True)['status'], 'completed')
         self.assertEqual(self.job(True)['attempts'], 2)
+        self.assertEqual(self.source.read_bytes(), self.original)
         self.source.unlink()
         self.conn.execute(text("UPDATE photo_archive_downloads SET status='failed', attempts=3"))
         photo_archive.enqueue_photo_download(self.conn, self.media['id'])

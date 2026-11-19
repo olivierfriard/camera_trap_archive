@@ -211,7 +211,8 @@ def register_photo_routes(app, main):
     def archive_media(conn, media_id, lock=False):
         clause = '' if main.g.current_user['is_admin'] else ' AND s.operator=:operator'
         params = dict(id=media_id, operator=session['username'])
-        query = '''SELECT m.*, t.status AS transfer_status, t.destination, t.source_md5
+        query = '''SELECT m.*, t.status AS transfer_status, t.destination, t.source_md5,
+                t.archive_filename, t.archive_md5
             FROM media m JOIN sighting s ON s.id=m.sighting_id
             JOIN photo_archive_transfers t ON t.media_id=m.id
             WHERE m.id=:id AND m.media_type='photo'
@@ -230,10 +231,13 @@ def register_photo_routes(app, main):
             row = archive_media(conn, media_id)
             recovery = conn.execute(text('SELECT status FROM photo_archive_downloads WHERE media_id=:id'), {'id': media_id}).mappings().fetchone()
         session.setdefault('archive_restore_csrf_token', secrets.token_urlsafe(32))
-        local = photo_path(app.config['UPLOAD_FOLDER'], row['new_file_name']).is_file()
-        return jsonify(status='completed', saved=True, transfer_status=row['transfer_status'],
+        filename = row['archive_filename'] or row['new_file_name']
+        converting = bool(row['archive_filename'] and not row['archive_md5'])
+        local = not converting and photo_path(app.config['UPLOAD_FOLDER'], filename, archive=True).is_file()
+        return jsonify(status=row['transfer_status'] if converting else 'completed', saved=True,
+                       transfer_status=None if converting else row['transfer_status'],
                        restore_status=recovery['status'] if recovery else None,
-                       download_url=url_for('uploaded_file', filename=row['new_file_name']) if local else None,
+                       download_url=url_for('uploaded_file', filename=filename) if local else None,
                        restore_url=url_for('restore_archive_photo', media_id=media_id) if not local and row['transfer_status']=='completed' else None,
                        restore_csrf_token=session['archive_restore_csrf_token'])
 
@@ -247,7 +251,7 @@ def register_photo_routes(app, main):
             row = archive_media(conn, media_id, lock=True)
             if row['transfer_status'] != 'completed':
                 abort(409)
-            if photo_path(app.config['UPLOAD_FOLDER'], row['new_file_name']).is_file():
+            if photo_path(app.config['UPLOAD_FOLDER'], row['archive_filename'] or row['new_file_name'], archive=True).is_file():
                 return jsonify(status='completed')
             enqueue_photo_download(conn, media_id)
         main.start_conversion_worker()

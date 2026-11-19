@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS public.photo_archive_downloads (
     next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_error TEXT
 );
+ALTER TABLE public.photo_archive_transfers ADD COLUMN IF NOT EXISTS archive_filename TEXT;
+ALTER TABLE public.photo_archive_transfers ADD COLUMN IF NOT EXISTS archive_md5 TEXT;
 """
 
 

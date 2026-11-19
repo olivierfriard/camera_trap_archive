@@ -19,9 +19,10 @@ LOGGER = logging.getLogger(__name__)
 PHOTO_EXTENSIONS = {'.jpg', '.jpeg', '.png'}
 
 
-def photo_path(folder, filename):
+def photo_path(folder, filename, *, archive=False):
     """Resolve only regular, non-symlink photo files directly inside the upload folder."""
-    if not filename or Path(filename).name != filename or Path(filename).suffix.lower() not in PHOTO_EXTENSIONS:
+    extensions = PHOTO_EXTENSIONS | ({'.webp'} if archive else set())
+    if not filename or Path(filename).name != filename or Path(filename).suffix.lower() not in extensions:
         raise ValueError('Invalid photo filename')
     if filename.endswith('.preview-1280.jpg'):
         raise ValueError('A preview cannot be used as an original photo')
