@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -36,23 +37,57 @@ def enqueue_conversion(conn, filename, operator, source_md5):
     })
 
 
+def is_easy_video_compressed(source, timeout=30, ffmpeg_binary="ffmpeg"):
+    """Read container metadata with the configured FFmpeg, without decoding frames."""
+    result = subprocess.run([
+        ffmpeg_binary, "-nostdin", "-hide_banner", "-loglevel", "error",
+        "-i", str(source), "-f", "ffmetadata", "pipe:1",
+    ], check=True, capture_output=True, text=True, timeout=timeout)
+    pending = ""
+    for physical in result.stdout.split("\n"):
+        pending += physical.removesuffix("\r")
+        trailing = len(pending) - len(pending.rstrip("\\"))
+        if trailing % 2:
+            pending = pending[:-1]
+            continue
+        line, pending = pending, ""
+        if line.startswith("["):
+            break  # Only container tags identify the compressor.
+        key, separator, value = line.partition("=")
+        if (separator and key.strip().replace("_", " ").casefold() == "easy video compressor"
+                and value.strip() == "Compressed with easy_video_compressor"):
+            return True
+    return False
+
+
 def convert_video(source, output, timeout=3600, ffmpeg_binary="ffmpeg"):
-    """Use easy_video_compressor's H.264 settings without reducing resolution."""
+    """Publish an archive MP4, avoiding re-encoding videos marked by the compressor."""
     temporary = None
     try:
+        compressed = is_easy_video_compressed(source, timeout=min(timeout, 30), ffmpeg_binary=ffmpeg_binary)
         with NamedTemporaryFile(dir=output.parent, suffix=".mp4", delete=False) as file:
             temporary = Path(file.name)
-        subprocess.run([
-            ffmpeg_binary, "-nostdin", "-hide_banner", "-loglevel", "error",
-            "-i", str(source),
-            "-map_metadata", "0", "-map_metadata:s", "0:s", "-map_chapters", "0",
-            "-c:v", "libx264", "-preset", "medium", "-crf", "24",
-            "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
-            "-threads", "2", "-y", str(temporary),
-        ], check=True, capture_output=True, timeout=timeout)
+        if compressed and source.suffix.lower() == ".mp4":
+            shutil.copyfile(source, temporary)
+            if file_md5(temporary) != file_md5(source):
+                raise OSError("Already-compressed MP4 copy failed verification")
+        else:
+            codecs = ["-c", "copy"] if compressed else [
+                "-c:v", "libx264", "-preset", "medium", "-crf", "24",
+                "-c:a", "aac", "-b:a", "128k", "-threads", "2",
+            ]
+            subprocess.run([
+                ffmpeg_binary, "-nostdin", "-hide_banner", "-loglevel", "error",
+                "-i", str(source),
+                "-map_metadata", "0", "-map_metadata:s", "0:s", "-map_chapters", "0",
+                *codecs, "-movflags", "+faststart+use_metadata_tags" if compressed else "+faststart",
+                "-y", str(temporary),
+            ], check=True, capture_output=True, timeout=timeout)
         if temporary.stat().st_size == 0:
             raise OSError("FFmpeg produced an empty MP4")
         temporary.replace(output)
+        if compressed:
+            LOGGER.info("Already compressed with easy_video_compressor; archived without re-encoding: %s", output.name)
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)

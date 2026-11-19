@@ -31,6 +31,20 @@ AAC 128 kbit/s, copied metadata and chapters, and MP4 faststart. Two encoding
 threads limit competition with synchronous previews. Uploaded originals and
 their MD5 values remain unchanged.
 
+Before archive compression, the worker reads container metadata using the
+configured `FFMPEG_CMD`, without decoding video frames (at most 30 seconds).
+If `Easy Video Compressor` equals `Compressed with easy_video_compressor`, an
+uploaded MP4 is copied byte-for-byte to `<source>.compressed.mp4`, with a verified
+matching MD5. For a different container carrying that tag, FFmpeg remuxes its
+streams into MP4 using `-c copy`, without re-encoding. Matroska's normalized tag
+name `EASY_VIDEO_COMPRESSOR` is also recognized. An absent or different tag keeps
+the regular compression settings above. A metadata inspection, copy or remux
+failure retains the source and uses the existing job retries. The archive naming,
+transfer, recovery and retention rules are the same for these files. Preview
+creation continues to encode its own 640-pixel video regardless of this tag.
+Restart the running conversion worker after deploying this change; no database
+migration or additional executable is needed.
+
 The PostgreSQL queue survives application and worker restarts. A session advisory
 lock permits one archive worker per database. The worker releases job transactions
 before running FFmpeg, atomically publishes completed MP4s, and retries failures

@@ -42,7 +42,8 @@ class ArchiveConversionTests(unittest.TestCase):
             self.assertNotEqual(Path(command[-1]), target)
             Path(command[-1]).write_bytes(b"complete mp4")
 
-        with patch("video_conversion.subprocess.run", side_effect=encode):
+        with patch("video_conversion.subprocess.run", side_effect=encode), \
+                patch("video_conversion.is_easy_video_compressed", return_value=False):
             video_conversion.convert_video(source, target, ffmpeg_binary="/opt/media tools/ffmpeg")
         self.assertEqual(source.read_bytes(), b"original")
         self.assertEqual(target.read_bytes(), b"complete mp4")
@@ -57,10 +58,93 @@ class ArchiveConversionTests(unittest.TestCase):
             Path(command[-1]).write_bytes(b"partial")
             raise subprocess.TimeoutExpired("ffmpeg", options["timeout"])
 
-        with patch("video_conversion.subprocess.run", side_effect=fail):
+        with patch("video_conversion.subprocess.run", side_effect=fail), \
+                patch("video_conversion.is_easy_video_compressed", return_value=False):
             with self.assertRaises(subprocess.TimeoutExpired):
                 video_conversion.convert_video(source, target)
         self.assertEqual(list(self.folder.iterdir()), [source])
+
+    def test_compressor_tag_requires_exact_key_and_value(self):
+        for metadata, expected in (
+            (';FFMETADATA1\nEasy Video Compressor=Compressed with easy_video_compressor\n', True),
+            (';FFMETADATA1\nEASY VIDEO COMPRESSOR=Compressed with easy_video_compressor\n', True),
+            (';FFMETADATA1\nEASY_VIDEO_COMPRESSOR=Compressed with easy_video_compressor\n', True),
+            (';FFMETADATA1\ncomment=Compressed with easy_video_compressor\n', False),
+            (';FFMETADATA1\nEasy Video Compressor=another program\n', False),
+            (';FFMETADATA1\ntitle=example\\\nEasy Video Compressor=Compressed with easy_video_compressor\n', False),
+            (';FFMETADATA1\ntitle=example\u2028Easy Video Compressor=Compressed with easy_video_compressor\n', False),
+            (';FFMETADATA1\n[CHAPTER]\nEasy Video Compressor=Compressed with easy_video_compressor\n', False),
+        ):
+            with self.subTest(metadata=metadata), patch('video_conversion.subprocess.run') as run:
+                run.return_value.stdout = metadata
+                self.assertEqual(video_conversion.is_easy_video_compressed(
+                    self.folder/'source.mp4', ffmpeg_binary='/opt/media tools/ffmpeg'), expected)
+                self.assertEqual(run.call_args.args[0][0], '/opt/media tools/ffmpeg')
+                self.assertNotIn('libx264', run.call_args.args[0])
+
+    def test_tag_read_failure_keeps_original_without_encoding(self):
+        source = self.folder / 'source.mp4'
+        source.write_bytes(b'original')
+        target = self.folder / (source.name + '.compressed.mp4')
+        with patch('video_conversion.subprocess.run', side_effect=subprocess.TimeoutExpired('ffmpeg', 30)) as run:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                video_conversion.convert_video(source, target)
+            run.assert_called_once()
+        self.assertEqual(list(self.folder.iterdir()), [source])
+
+    def test_failed_copy_verification_keeps_original_and_removes_temporary(self):
+        source = self.folder / 'source.mp4'
+        source.write_bytes(b'original')
+        target = self.folder / (source.name + '.compressed.mp4')
+        with patch('video_conversion.is_easy_video_compressed', return_value=True), \
+                patch('video_conversion.shutil.copyfile', side_effect=lambda src, dst: dst.write_bytes(b'partial')):
+            with self.assertRaisesRegex(OSError, 'copy failed verification'):
+                video_conversion.convert_video(source, target)
+        self.assertEqual(list(self.folder.iterdir()), [source])
+        self.assertEqual(source.read_bytes(), b'original')
+
+    @unittest.skipUnless(shutil.which('ffmpeg'), 'FFmpeg is required')
+    def test_real_compressor_mp4_is_copied_byte_for_byte_with_archive_name(self):
+        source = self.folder / 'upload.mp4'
+        subprocess.run([
+            'ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi',
+            '-i', 'testsrc2=size=80x40:rate=10', '-t', '0.2', '-c:v', 'libx264', '-threads', '1',
+            '-metadata', 'Easy Video Compressor=Compressed with easy_video_compressor',
+            '-movflags', '+use_metadata_tags', str(source),
+        ], check=True, capture_output=True, timeout=15)
+        target = self.folder / (source.name + '.compressed.mp4')
+        self.assertTrue(video_conversion.is_easy_video_compressed(source))
+        with patch('video_conversion.subprocess.run', wraps=subprocess.run) as run:
+            video_conversion.convert_video(source, target)
+        run.assert_called_once()  # Metadata inspection only; no encoding subprocess.
+        self.assertEqual(target.read_bytes(), source.read_bytes())
+        self.assertEqual(target.name, 'upload.mp4.compressed.mp4')
+        self.assertEqual(set(self.folder.iterdir()), {source, target})
+
+    @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'FFmpeg tools are required')
+    def test_tagged_other_container_is_remuxed_without_encoding(self):
+        source = self.folder / 'upload.mkv'
+        subprocess.run([
+            'ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi',
+            '-i', 'testsrc2=size=80x40:rate=10', '-t', '0.2', '-c:v', 'libx264', '-threads', '1',
+            '-metadata', 'Easy Video Compressor=Compressed with easy_video_compressor', str(source),
+        ], check=True, capture_output=True, timeout=15)
+        target = self.folder / (source.name + '.compressed.mp4')
+        original_hash = video_conversion.file_md5(source)
+        with patch('video_conversion.subprocess.run', wraps=subprocess.run) as run:
+            video_conversion.convert_video(source, target)
+        command = run.call_args.args[0]
+        self.assertEqual(command[command.index('-c')+1], 'copy')
+        self.assertNotIn('libx264', command)
+        self.assertTrue(video_conversion.is_easy_video_compressed(target))
+        self.assertEqual(video_conversion.file_md5(source), original_hash)
+        packets = []
+        for path in (source, target):
+            result = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0',
+                '-show_packets', '-show_data_hash', 'sha256', '-of', 'json', str(path)],
+                check=True, capture_output=True, text=True, timeout=10)
+            packets.append([packet['data_hash'] for packet in json.loads(result.stdout)['packets']])
+        self.assertEqual(packets[0], packets[1])
 
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg tools are required")
     def test_real_mp4_compression_keeps_resolution_and_metadata(self):
