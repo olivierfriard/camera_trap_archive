@@ -100,7 +100,10 @@
 
         {# {% include "archive_status.html" %} #}
 
-        <form id="uploadForm" method="post" action="{{ edit_url if is_edit else url_for('save_sighting') }}" enctype="multipart/form-data">
+        {% set auto_sighting_code = not is_edit and (not date or request.form.get('auto_sighting_code') == '1') %}
+        <form id="uploadForm" method="post" action="{{ edit_url if is_edit else url_for('save_sighting') }}" enctype="multipart/form-data"
+            {% if auto_sighting_code %}data-sighting-user-code="{{ session.get('code', '') }}"{% endif %}>
+            {% if auto_sighting_code %}<input type="hidden" name="auto_sighting_code" value="1" />{% endif %}
             {% if is_edit %}
             <input type="hidden" name="csrf_token" value="{{ session['sighting_csrf_token'] }}" />
             {% else %}
@@ -234,4 +237,5 @@
 <script src="{{ url_for('static', filename='js/utm-coordinates.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sighting-coordinates.js') }}"></script>
 {% if is_photo %}<script src="{{ url_for('static', filename='js/photo-dates.js') }}"></script>{% endif %}
+{% if not is_edit %}<script src="{{ url_for('static', filename='js/sighting-code.js') }}"></script>{% endif %}
 {% endblock %}
