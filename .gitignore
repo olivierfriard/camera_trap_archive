@@ -5,3 +5,4 @@ users.py
 .env
 instance/geocoding.sqlite3*
 instance/video-conversion.log*
+*.exe
