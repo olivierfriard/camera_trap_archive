@@ -6,3 +6,4 @@ users.py
 instance/geocoding.sqlite3*
 instance/video-conversion.log*
 *.exe
+instance
